@@ -1,0 +1,62 @@
+# xpbx — Self-hosted PBX (Asterisk + Web UI)
+#
+# Network setup:
+#   EXTERNAL_IP is the IP address phones use to reach this server.
+#   Auto-detected via STUN (public IP) if not set.
+#
+#   Override for specific network setups:
+#     EXTERNAL_IP=100.96.49.117 docker compose up -d    # Tailscale/VPN
+#     EXTERNAL_IP=192.168.1.50 docker compose up -d     # LAN-only
+#
+#   Or set in .env file:
+#     EXTERNAL_IP=100.96.49.117
+
+services:
+  asterisk:
+    image: andrius/asterisk:latest
+    container_name: xpbx-asterisk
+    entrypoint: ["/scripts/entrypoint.sh", "-f"]
+    tty: true                  # Asterisk console needs a TTY; without one it floods NUL bytes
+    stdin_open: true
+    ports:
+      - "5060:5060/udp"                # SIP signaling
+      - "5060:5060/tcp"
+      - "10000-10099:10000-10099/udp"  # RTP media
+    volumes:
+      - ./asterisk/config:/etc/asterisk
+      - ./asterisk/scripts/entrypoint.sh:/scripts/entrypoint.sh:ro
+      - xpbx-data:/data
+    environment:
+      - SYSLOG_LEVEL=4
+      - EXTERNAL_IP=${EXTERNAL_IP:-}   # Auto-detected via STUN if empty
+    networks:
+      - xpbx-network
+
+  xpbx:
+    build: ./server
+    container_name: xpbx-server
+    environment:
+      - XPBX_LISTEN_ADDR=:8080
+      - XPBX_DB_PATH=/data/asterisk-realtime.db
+      - ARI_HOST=asterisk
+      - ARI_PORT=8088
+      - ARI_USER=xpbx
+      - ARI_PASSWORD=secret
+      - EXTERNAL_IP=${EXTERNAL_IP:-}
+      - LOG_LEVEL=debug
+    ports:
+      - "8080:8080"
+    volumes:
+      - xpbx-data:/data
+    depends_on:
+      asterisk:
+        condition: service_started
+    networks:
+      - xpbx-network
+
+volumes:
+  xpbx-data:
+
+networks:
+  xpbx-network:
+    driver: bridge

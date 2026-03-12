@@ -1,0 +1,637 @@
+package pages
+
+import (
+	"fmt"
+	"strings"
+	"github.com/x-phone/xpbx/server/internal/database"
+	"github.com/x-phone/xpbx/server/templates/layouts"
+)
+
+// ExtensionItem bundles an extension with its routing and voicemail info for the list view.
+type ExtensionItem struct {
+	Extension database.Extension
+	Routing   RoutingInfo
+	Voicemail *database.VoicemailSettings
+}
+
+templ ExtensionsList(items []ExtensionItem) {
+	@layouts.Base("Extensions") {
+		<div class="space-y-6">
+			<div class="flex items-center justify-between">
+				<div>
+					<h1 class="text-2xl font-bold text-slate-900">Extensions</h1>
+					<p class="mt-1 text-sm text-slate-500">Manage SIP extensions for your PBX.</p>
+				</div>
+				<a href="/extensions/new" class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-500 transition-colors">
+					<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+					</svg>
+					New Extension
+				</a>
+			</div>
+
+			if len(items) == 0 {
+				@emptyState("No extensions yet", "Get started by creating your first SIP extension.", "/extensions/new", "New Extension")
+			} else {
+				<div class="grid gap-3">
+					for _, item := range items {
+						@extensionCard(item)
+					}
+				</div>
+			}
+		</div>
+	}
+}
+
+templ extensionCard(item ExtensionItem) {
+	<div id={ "ext-" + item.Extension.Extension } class="rounded-xl bg-white shadow-sm ring-1 ring-slate-200 hover:ring-slate-300 transition-all" x-data="{ open: false }">
+		<!-- Header (always visible, clickable to expand) -->
+		<div class="px-6 py-4 flex items-center justify-between cursor-pointer" x-on:click="open = !open">
+			<div class="flex items-center gap-4">
+				<div class="flex h-11 w-11 items-center justify-center rounded-lg bg-brand-50 text-brand-600 font-bold text-sm">
+					{ item.Extension.Extension }
+				</div>
+				<div>
+					<div class="flex items-center gap-2">
+						<p class="text-sm font-semibold text-slate-900">
+							if item.Extension.DisplayName != "" {
+								{ item.Extension.DisplayName }
+							} else {
+								Extension { item.Extension.Extension }
+							}
+						</p>
+						<!-- Status badges -->
+						if item.Routing.Enabled {
+							@routingPatternBadge(item.Routing.Pattern)
+						}
+						if item.Voicemail != nil && item.Voicemail.Enabled {
+							<span class="inline-flex items-center rounded-md bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-600">VM</span>
+						}
+					</div>
+					<div class="flex items-center gap-2 mt-1">
+						<span class="text-xs text-slate-400">{ item.Extension.Context }</span>
+						<span class="text-slate-200">|</span>
+						@codecBadges(item.Extension.Codecs)
+						<span class="text-slate-200">|</span>
+						<span class="text-xs text-slate-400">{ fmt.Sprintf("%d contacts", item.Extension.MaxContacts) }</span>
+					</div>
+				</div>
+			</div>
+			<div class="flex items-center gap-3">
+				<!-- Expand chevron -->
+				<svg class="h-5 w-5 text-slate-400 transition-transform duration-200" x-bind:class="open && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/>
+				</svg>
+			</div>
+		</div>
+
+		<!-- Expanded details -->
+		<div x-show="open" x-cloak x-collapse>
+			<div class="border-t border-slate-100 px-6 py-4">
+				<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+					<!-- SIP Details -->
+					<div>
+						<dt class="text-xs font-medium text-slate-400 uppercase tracking-wider">Password</dt>
+						<dd class="mt-1 text-sm font-mono text-slate-700">{ item.Extension.Password }</dd>
+					</div>
+					<div>
+						<dt class="text-xs font-medium text-slate-400 uppercase tracking-wider">Transport</dt>
+						<dd class="mt-1 text-sm text-slate-700">{ item.Extension.Transport }</dd>
+					</div>
+					<div>
+						<dt class="text-xs font-medium text-slate-400 uppercase tracking-wider">Context</dt>
+						<dd class="mt-1 text-sm font-mono text-slate-700">{ item.Extension.Context }</dd>
+					</div>
+					<div>
+						<dt class="text-xs font-medium text-slate-400 uppercase tracking-wider">Max Contacts</dt>
+						<dd class="mt-1 text-sm text-slate-700">{ fmt.Sprintf("%d", item.Extension.MaxContacts) }</dd>
+					</div>
+				</div>
+
+				<!-- Routing Info -->
+				<div class="mt-4 pt-4 border-t border-slate-50">
+					<dt class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Call Routing</dt>
+					if item.Routing.Enabled {
+						<div class="flex items-center gap-3">
+							@routingPatternPipeline(item.Routing.Pattern)
+							if item.Routing.Pattern != "voicemail_only" {
+								<span class="text-xs text-slate-400">{ fmt.Sprintf("Ring %ds", item.Routing.Timeout) }</span>
+							}
+						</div>
+					} else if item.Routing.HasCustomRules {
+						<span class="text-xs text-slate-500">{ fmt.Sprintf("%d custom rule(s)", item.Routing.RuleCount) } — <a href="/dialplan?mode=advanced" class="text-brand-600 hover:text-brand-700">view in dialplan</a></span>
+					} else {
+						<span class="text-xs text-slate-400">No routing configured</span>
+					}
+				</div>
+
+				<!-- Voicemail Info -->
+				<div class="mt-3 pt-3 border-t border-slate-50">
+					<dt class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Voicemail</dt>
+					if item.Voicemail != nil && item.Voicemail.Enabled {
+						<div class="flex items-center gap-4">
+							<div class="flex items-center gap-1.5">
+								<svg class="h-3.5 w-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
+								</svg>
+								<span class="text-xs text-slate-600">Enabled</span>
+							</div>
+							<span class="text-xs text-slate-400">PIN: <span class="font-mono">{ item.Voicemail.PIN }</span></span>
+							if item.Voicemail.Email != "" {
+								<span class="text-xs text-slate-400">Email: { item.Voicemail.Email }</span>
+							}
+						</div>
+					} else {
+						<span class="text-xs text-slate-400">Not enabled</span>
+					}
+				</div>
+
+				<!-- Actions -->
+				<div class="mt-4 pt-4 border-t border-slate-100 flex items-center gap-2">
+					<a href={ templ.URL("/extensions/" + item.Extension.Extension + "/edit") }
+						class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-500 transition-colors">
+						<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"/>
+						</svg>
+						Edit
+					</a>
+					<button
+						hx-delete={ "/extensions/" + item.Extension.Extension }
+						hx-target={ "#ext-" + item.Extension.Extension }
+						hx-swap="outerHTML"
+						hx-confirm={ "Delete extension " + item.Extension.Extension + "?" }
+						class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-red-600 ring-1 ring-inset ring-red-200 hover:bg-red-50 transition-colors"
+						x-on:click.stop
+					>
+						<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/>
+						</svg>
+						Delete
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+templ routingPatternBadge(pattern string) {
+	switch pattern {
+		case "ring_only":
+			<span class="inline-flex items-center rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600">Ring</span>
+		case "ring_voicemail":
+			<span class="inline-flex items-center rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-600">Ring+VM</span>
+		case "voicemail_only":
+			<span class="inline-flex items-center rounded-md bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-600">VM only</span>
+		default:
+			<span class="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">Custom</span>
+	}
+}
+
+templ routingPatternPipeline(pattern string) {
+	switch pattern {
+		case "ring_only":
+			<div class="flex items-center gap-1.5 text-xs font-mono">
+				<span class="rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-700">NoOp</span>
+				<span class="text-slate-300">→</span>
+				<span class="rounded bg-blue-100 px-1.5 py-0.5 text-blue-700">Dial</span>
+				<span class="text-slate-300">→</span>
+				<span class="rounded bg-red-100 px-1.5 py-0.5 text-red-700">Hangup</span>
+			</div>
+		case "ring_voicemail":
+			<div class="flex items-center gap-1.5 text-xs font-mono">
+				<span class="rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-700">NoOp</span>
+				<span class="text-slate-300">→</span>
+				<span class="rounded bg-blue-100 px-1.5 py-0.5 text-blue-700">Dial</span>
+				<span class="text-slate-300">→</span>
+				<span class="rounded bg-violet-100 px-1.5 py-0.5 text-violet-700">VoiceMail</span>
+				<span class="text-slate-300">→</span>
+				<span class="rounded bg-red-100 px-1.5 py-0.5 text-red-700">Hangup</span>
+			</div>
+		case "voicemail_only":
+			<div class="flex items-center gap-1.5 text-xs font-mono">
+				<span class="rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-700">NoOp</span>
+				<span class="text-slate-300">→</span>
+				<span class="rounded bg-violet-100 px-1.5 py-0.5 text-violet-700">VoiceMail</span>
+				<span class="text-slate-300">→</span>
+				<span class="rounded bg-red-100 px-1.5 py-0.5 text-red-700">Hangup</span>
+			</div>
+	}
+}
+
+// RoutingInfo carries the state of quick routing for the extension form.
+type RoutingInfo struct {
+	Enabled        bool
+	Pattern        string // "ring_only", "ring_voicemail", "voicemail_only"
+	Timeout        int
+	IsBasicPattern bool // true if existing rules match a known pattern exactly
+	HasCustomRules bool // true if rules exist but don't match any known pattern
+	RuleCount      int  // number of custom rules
+}
+
+templ ExtensionForm(ext *database.Extension, isEdit bool, routing RoutingInfo, vm *database.VoicemailSettings) {
+	@layouts.Base(formTitle("Extension", isEdit)) {
+		<div class="mx-auto max-w-2xl" x-data={ fmt.Sprintf(`{
+			routingEnabled: %t,
+			pattern: '%s',
+			vmEnabled: %t,
+			get vmPattern() { return this.pattern === 'ring_voicemail' || this.pattern === 'voicemail_only' },
+			setPattern(p) {
+				this.pattern = p;
+				if (p === 'ring_voicemail' || p === 'voicemail_only') this.vmEnabled = true;
+			},
+			toggleVm(on) {
+				this.vmEnabled = on;
+				if (!on && this.vmPattern) this.pattern = 'ring_only';
+			}
+		}`, routing.Enabled, routing.Pattern, vm.Enabled) }>
+			<div class="mb-8">
+				<h1 class="text-2xl font-bold text-slate-900">
+					if isEdit {
+						Edit Extension { ext.Extension }
+					} else {
+						New Extension
+					}
+				</h1>
+				<p class="mt-1 text-sm text-slate-500">
+					if isEdit {
+						Update the SIP extension configuration.
+					} else {
+						Create a new SIP extension for your PBX.
+					}
+				</p>
+			</div>
+
+			<form
+				if isEdit {
+					hx-put={ "/extensions/" + ext.Extension }
+				} else {
+					hx-post="/extensions"
+				}
+				hx-target="body"
+				class="space-y-6"
+			>
+				<!-- Basic Info -->
+				<div class="rounded-xl bg-white shadow-sm ring-1 ring-slate-200 p-6">
+					<h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-4">Basic Info</h2>
+					<div class="grid grid-cols-2 gap-4">
+						<div>
+							<label for="extension" class="block text-sm font-medium text-slate-700">Extension Number</label>
+							<input type="text" name="extension" id="extension" value={ ext.Extension }
+								if isEdit { readonly }
+								required
+								class={ "mt-1.5 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 text-sm border px-3 py-2",
+									templ.KV("bg-slate-50 text-slate-500", isEdit) }
+								placeholder="1004"/>
+						</div>
+						<div>
+							<label for="display_name" class="block text-sm font-medium text-slate-700">Display Name</label>
+							<input type="text" name="display_name" id="display_name" value={ ext.DisplayName }
+								class="mt-1.5 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 text-sm border px-3 py-2"
+								placeholder="John Doe"/>
+						</div>
+					</div>
+				</div>
+
+				<!-- Authentication -->
+				<div class="rounded-xl bg-white shadow-sm ring-1 ring-slate-200 p-6">
+					<h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-4">Authentication</h2>
+					<div class="grid grid-cols-2 gap-4">
+						<div>
+							<label for="password" class="block text-sm font-medium text-slate-700">Password</label>
+							<input type="text" name="password" id="password" value={ ext.Password } required
+								class="mt-1.5 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 text-sm border px-3 py-2 font-mono"
+								placeholder="password123"/>
+						</div>
+						<div>
+							<label for="context" class="block text-sm font-medium text-slate-700">Context</label>
+							<input type="text" name="context" id="context" value={ ext.Context } required
+								class="mt-1.5 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 text-sm border px-3 py-2"
+								placeholder="from-internal"/>
+						</div>
+					</div>
+				</div>
+
+				<!-- Media -->
+				<div class="rounded-xl bg-white shadow-sm ring-1 ring-slate-200 p-6">
+					<h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-4">Media</h2>
+					<div>
+						<label class="block text-sm font-medium text-slate-700 mb-3">Audio Codecs</label>
+						<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+							@codecCheckbox("ulaw", "G.711 u-law", "8 kHz", ext.Codecs)
+							@codecCheckbox("alaw", "G.711 A-law", "8 kHz", ext.Codecs)
+							@codecCheckbox("g722", "G.722", "16 kHz HD", ext.Codecs)
+							@codecCheckbox("opus", "Opus", "Variable", ext.Codecs)
+						</div>
+						<input type="hidden" name="codecs" id="codecs-hidden" value={ ext.Codecs }/>
+					</div>
+					<div class="mt-4">
+						<label for="max_contacts" class="block text-sm font-medium text-slate-700">Max Registrations</label>
+						<p class="text-xs text-slate-400 mt-0.5">How many devices can register simultaneously.</p>
+						<input type="number" name="max_contacts" id="max_contacts" value={ fmt.Sprintf("%d", ext.MaxContacts) } min="1"
+							class="mt-1.5 block w-24 rounded-lg border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 text-sm border px-3 py-2"/>
+					</div>
+				</div>
+
+				<!-- Quick Routing -->
+				<div class="rounded-xl bg-white shadow-sm ring-1 ring-slate-200 p-6">
+					<div class="flex items-center justify-between mb-1">
+						<h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider">Call Routing</h2>
+						<a href="/dialplan" class="text-xs text-brand-600 hover:text-brand-700 font-medium">Advanced routing →</a>
+					</div>
+					<p class="text-xs text-slate-400 mb-4">Automatically create dialplan rules so other extensions can call this one.</p>
+
+					if routing.HasCustomRules {
+						<!-- Custom rules exist — don't let them overwrite blindly -->
+						<div class="rounded-lg border border-amber-200 bg-amber-50 p-4">
+							<div class="flex gap-3">
+								<svg class="h-5 w-5 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
+								</svg>
+								<div class="text-sm">
+									<p class="font-medium text-amber-800">Custom routing rules detected</p>
+									<p class="mt-1 text-amber-700">
+										This extension has { fmt.Sprintf("%d", routing.RuleCount) } custom dialplan rule(s) that were configured manually.
+										Edit them in the <a href="/dialplan?mode=advanced" class="font-medium underline">advanced dialplan editor</a>.
+									</p>
+								</div>
+							</div>
+						</div>
+					} else {
+						<!-- Toggle for basic routing -->
+						<label class="relative flex items-start gap-3 cursor-pointer group">
+							<div class="flex h-6 items-center">
+								<input type="checkbox" name="routing_enabled"
+									x-model="routingEnabled"
+									class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"/>
+							</div>
+							<div>
+								<span class="text-sm font-medium text-slate-900">Enable call routing</span>
+								<p class="text-xs text-slate-400 mt-0.5">
+									Set up how incoming calls to this extension are handled.
+								</p>
+							</div>
+						</label>
+
+						<!-- Routing options (shown when enabled) -->
+						<div x-show="routingEnabled" x-cloak class="mt-4 ml-7 space-y-5">
+							<!-- Pattern selector -->
+							<input type="hidden" name="routing_pattern" x-bind:value="pattern"/>
+							<fieldset>
+								<legend class="text-sm font-medium text-slate-700 mb-3">Routing pattern</legend>
+								<div class="space-y-2">
+									<!-- Ring only -->
+									<label class="relative flex items-start rounded-lg border p-3.5 cursor-pointer hover:bg-slate-50 transition-colors"
+										x-bind:class="pattern === 'ring_only' ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500' : 'border-slate-200'">
+										<div class="flex h-5 items-center">
+											<input type="radio" name="_pattern_radio" value="ring_only"
+												x-on:change="setPattern('ring_only')" x-bind:checked="pattern === 'ring_only'"
+												class="h-4 w-4 border-slate-300 text-brand-600 focus:ring-brand-500"/>
+										</div>
+										<div class="ml-3">
+											<span class="block text-sm font-medium text-slate-900">Ring, then hang up</span>
+											<span class="block text-xs text-slate-500 mt-0.5">Ring the device. If no one answers, the call ends.</span>
+											<div x-show="pattern === 'ring_only'" x-cloak class="mt-2 flex items-center gap-1.5 text-xs font-mono text-slate-400">
+												<span class="rounded bg-emerald-100 px-1 text-emerald-700">NoOp</span>
+												<span>→</span>
+												<span class="rounded bg-blue-100 px-1 text-blue-700">Dial</span>
+												<span>→</span>
+												<span class="rounded bg-red-100 px-1 text-red-700">Hangup</span>
+											</div>
+										</div>
+									</label>
+
+									<!-- Ring + Voicemail -->
+									<label class="relative flex items-start rounded-lg border p-3.5 transition-colors"
+										x-bind:class="[
+											pattern === 'ring_voicemail' ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500' : 'border-slate-200',
+											!vmEnabled && pattern !== 'ring_voicemail' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-50'
+										]">
+										<div class="flex h-5 items-center">
+											<input type="radio" name="_pattern_radio" value="ring_voicemail"
+												x-on:change="setPattern('ring_voicemail')" x-bind:checked="pattern === 'ring_voicemail'"
+												x-bind:disabled="!vmEnabled && pattern !== 'ring_voicemail'"
+												class="h-4 w-4 border-slate-300 text-brand-600 focus:ring-brand-500"/>
+										</div>
+										<div class="ml-3">
+											<div class="flex items-center gap-2">
+												<span class="block text-sm font-medium text-slate-900">Ring, then voicemail</span>
+												<span x-show="!vmEnabled" x-cloak class="text-[10px] font-medium text-amber-600 bg-amber-50 rounded px-1.5 py-0.5">Requires voicemail</span>
+											</div>
+											<span class="block text-xs text-slate-500 mt-0.5">Ring the device. If no answer, send the caller to voicemail.</span>
+											<div x-show="pattern === 'ring_voicemail'" x-cloak class="mt-2 flex items-center gap-1.5 text-xs font-mono text-slate-400">
+												<span class="rounded bg-emerald-100 px-1 text-emerald-700">NoOp</span>
+												<span>→</span>
+												<span class="rounded bg-blue-100 px-1 text-blue-700">Dial</span>
+												<span>→</span>
+												<span class="rounded bg-violet-100 px-1 text-violet-700">VoiceMail</span>
+												<span>→</span>
+												<span class="rounded bg-red-100 px-1 text-red-700">Hangup</span>
+											</div>
+										</div>
+									</label>
+
+									<!-- Voicemail only -->
+									<label class="relative flex items-start rounded-lg border p-3.5 transition-colors"
+										x-bind:class="[
+											pattern === 'voicemail_only' ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500' : 'border-slate-200',
+											!vmEnabled && pattern !== 'voicemail_only' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-50'
+										]">
+										<div class="flex h-5 items-center">
+											<input type="radio" name="_pattern_radio" value="voicemail_only"
+												x-on:change="setPattern('voicemail_only')" x-bind:checked="pattern === 'voicemail_only'"
+												x-bind:disabled="!vmEnabled && pattern !== 'voicemail_only'"
+												class="h-4 w-4 border-slate-300 text-brand-600 focus:ring-brand-500"/>
+										</div>
+										<div class="ml-3">
+											<div class="flex items-center gap-2">
+												<span class="block text-sm font-medium text-slate-900">Voicemail only</span>
+												<span x-show="!vmEnabled" x-cloak class="text-[10px] font-medium text-amber-600 bg-amber-50 rounded px-1.5 py-0.5">Requires voicemail</span>
+											</div>
+											<span class="block text-xs text-slate-500 mt-0.5">Go straight to voicemail — no ringing. Useful for shared mailboxes.</span>
+											<div x-show="pattern === 'voicemail_only'" x-cloak class="mt-2 flex items-center gap-1.5 text-xs font-mono text-slate-400">
+												<span class="rounded bg-emerald-100 px-1 text-emerald-700">NoOp</span>
+												<span>→</span>
+												<span class="rounded bg-violet-100 px-1 text-violet-700">VoiceMail</span>
+												<span>→</span>
+												<span class="rounded bg-red-100 px-1 text-red-700">Hangup</span>
+											</div>
+										</div>
+									</label>
+								</div>
+							</fieldset>
+
+							<!-- Ring timeout (only for patterns that include Dial) -->
+							<div x-show="pattern !== 'voicemail_only'" x-cloak>
+								<label for="routing_timeout" class="block text-sm font-medium text-slate-700">Ring timeout</label>
+								<p class="text-xs text-slate-400 mt-0.5">How long to ring before moving to the next step (in seconds).</p>
+								<input type="number" name="routing_timeout" id="routing_timeout"
+									value={ fmt.Sprintf("%d", routing.Timeout) }
+									min="5" max="120"
+									class="mt-1.5 block w-24 rounded-lg border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 text-sm border px-3 py-2"/>
+							</div>
+						</div>
+
+						if isEdit && routing.IsBasicPattern {
+							<!-- Hidden field to signal removal when unchecking -->
+							<input type="hidden" name="routing_remove" x-bind:value="routingEnabled ? 'off' : 'on'"/>
+						}
+					}
+				</div>
+
+				<!-- Voicemail -->
+				<div class="rounded-xl bg-white shadow-sm ring-1 ring-slate-200 p-6">
+					<h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-1">Voicemail</h2>
+					<p class="text-xs text-slate-400 mb-4">Configure a voicemail mailbox for this extension.</p>
+
+					<label class="relative flex items-start gap-3 cursor-pointer group">
+						<div class="flex h-6 items-center">
+							<input type="checkbox" name="vm_enabled"
+								x-bind:checked="vmEnabled"
+								x-on:change="toggleVm($el.checked)"
+								class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"/>
+						</div>
+						<div>
+							<span class="text-sm font-medium text-slate-900">Enable voicemail</span>
+							<p class="text-xs text-slate-400 mt-0.5">
+								Create a voicemail mailbox so callers can leave messages.
+							</p>
+							<p x-show="vmPattern && vmEnabled" x-cloak class="text-xs text-brand-600 mt-1">
+								Required by your current routing pattern.
+							</p>
+						</div>
+					</label>
+
+					<div x-show="vmEnabled" x-cloak class="mt-4 ml-7 space-y-4">
+						<div class="grid grid-cols-2 gap-4">
+							<div>
+								<label for="vm_pin" class="block text-sm font-medium text-slate-700">Voicemail PIN</label>
+								<p class="text-xs text-slate-400 mt-0.5">Used to check messages (via *97).</p>
+								<input type="text" name="vm_pin" id="vm_pin" value={ vm.PIN }
+									class="mt-1.5 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 text-sm border px-3 py-2 font-mono"
+									placeholder="0000"
+									inputmode="numeric"
+									pattern="[0-9]*"/>
+							</div>
+							<div>
+								<label for="vm_email" class="block text-sm font-medium text-slate-700">Email notification <span class="text-slate-400 font-normal">(optional)</span></label>
+								<p class="text-xs text-slate-400 mt-0.5">Get notified when a message is left.</p>
+								<input type="email" name="vm_email" id="vm_email" value={ vm.Email }
+									class="mt-1.5 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 text-sm border px-3 py-2"
+									placeholder="user@example.com"/>
+							</div>
+						</div>
+
+						<!-- Voicemail info hint -->
+						<div class="rounded-lg bg-slate-50 p-3">
+							<p class="text-xs font-medium text-slate-500 mb-1.5">How to use voicemail</p>
+							<div class="space-y-1 text-xs text-slate-500">
+								<div class="flex items-start gap-2">
+									<span class="text-slate-400 shrink-0 mt-px">
+										<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 0 1-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 0 0-1.091-.852H4.5A2.25 2.25 0 0 0 2.25 4.5v2.25Z"/>
+										</svg>
+									</span>
+									<span>Callers hear a greeting and can record a message after the beep</span>
+								</div>
+								<div class="flex items-start gap-2">
+									<span class="text-slate-400 shrink-0 mt-px">
+										<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"/>
+										</svg>
+									</span>
+									<span>To check messages, select the <strong>"Ring, then voicemail"</strong> or <strong>"Voicemail only"</strong> routing pattern above</span>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<!-- Actions -->
+				<div class="flex justify-end gap-3">
+					<a href="/extensions" class="rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 transition-colors">Cancel</a>
+					<button type="submit" class="rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-500 transition-colors">
+						if isEdit {
+							Update Extension
+						} else {
+							Create Extension
+						}
+					</button>
+				</div>
+			</form>
+
+			<script>
+				document.querySelector('form').addEventListener('submit', function() {
+					var checked = Array.from(document.querySelectorAll('input[name="codec"]:checked'));
+					document.getElementById('codecs-hidden').value = checked.map(function(c) { return c.value; }).join(',');
+				});
+			</script>
+		</div>
+	}
+}
+
+templ codecCheckbox(value, label, description, currentCodecs string) {
+	<label class={ "relative flex items-start rounded-lg border p-3 cursor-pointer hover:bg-slate-50 transition-colors",
+		templ.KV("border-brand-500 bg-brand-50 ring-1 ring-brand-500", hasCodec(currentCodecs, value)),
+		templ.KV("border-slate-200", !hasCodec(currentCodecs, value)) }>
+		<div class="flex h-5 items-center">
+			<input type="checkbox" name="codec" value={ value }
+				if hasCodec(currentCodecs, value) { checked }
+				class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"/>
+		</div>
+		<div class="ml-3">
+			<span class="block text-sm font-medium text-slate-900">{ label }</span>
+			<span class="block text-xs text-slate-400">{ description }</span>
+		</div>
+	</label>
+}
+
+templ codecBadges(codecs string) {
+	for _, c := range splitCodecs(codecs) {
+		<span class="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-600">{ c }</span>
+	}
+}
+
+templ emptyState(title, description, href, action string) {
+	<div class="text-center py-16">
+		<svg class="mx-auto h-12 w-12 text-slate-300" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
+			<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+		</svg>
+		<h3 class="mt-3 text-sm font-semibold text-slate-900">{ title }</h3>
+		<p class="mt-1 text-sm text-slate-500">{ description }</p>
+		<div class="mt-6">
+			<a href={ templ.URL(href) } class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-500 transition-colors">
+				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+				</svg>
+				{ action }
+			</a>
+		</div>
+	</div>
+}
+
+func hasCodec(codecList, codec string) bool {
+	for _, c := range strings.Split(codecList, ",") {
+		if strings.TrimSpace(c) == codec {
+			return true
+		}
+	}
+	return false
+}
+
+func splitCodecs(codecs string) []string {
+	var out []string
+	for _, c := range strings.Split(codecs, ",") {
+		c = strings.TrimSpace(c)
+		if c != "" {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+func formTitle(entity string, isEdit bool) string {
+	if isEdit {
+		return "Edit " + entity
+	}
+	return "New " + entity
+}

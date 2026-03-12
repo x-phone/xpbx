@@ -1,0 +1,22 @@
+# Binaries
+server/xpbx
+*.exe
+
+# Generated templ files
+*_templ.go
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+
+# Data
+*.db
+*.db-wal
+*.db-shm
+
+# Environment
+.env

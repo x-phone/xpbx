@@ -1,0 +1,236 @@
+package pages
+
+import (
+	"fmt"
+	"strings"
+	"github.com/x-phone/xpbx/server/internal/database"
+	"github.com/x-phone/xpbx/server/templates/layouts"
+)
+
+templ TrunksList(trunks []database.Trunk) {
+	@layouts.Base("Trunks") {
+		<div class="space-y-6">
+			<div class="flex items-center justify-between">
+				<div>
+					<h1 class="text-2xl font-bold text-slate-900">Trunks</h1>
+					<p class="mt-1 text-sm text-slate-500">SIP trunk connections for outbound and inbound routing.</p>
+				</div>
+				<a href="/trunks/new" class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-500 transition-colors">
+					<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+					</svg>
+					New Trunk
+				</a>
+			</div>
+
+			if len(trunks) == 0 {
+				@trunkEmptyState()
+			} else {
+				<div class="grid gap-4">
+					for _, t := range trunks {
+						@trunkCard(t)
+					}
+				</div>
+			}
+		</div>
+	}
+}
+
+templ trunkCard(t database.Trunk) {
+	<div id={ fmt.Sprintf("trunk-%d", t.ID) } class="rounded-xl bg-white shadow-sm ring-1 ring-slate-200 hover:ring-slate-300 transition-all">
+		<div class="px-6 py-4 flex items-center justify-between">
+			<div class="flex items-center gap-4">
+				<div class="flex h-11 w-11 items-center justify-center rounded-lg bg-blue-50">
+					<svg class="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/>
+					</svg>
+				</div>
+				<div>
+					<div class="flex items-center gap-2">
+						<p class="text-sm font-semibold text-slate-900">{ t.Name }</p>
+						if t.Provider != "" {
+							<span class="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-600">{ t.Provider }</span>
+						}
+					</div>
+					<div class="flex items-center gap-2 mt-1">
+						<span class="text-xs font-mono text-slate-400">{ fmt.Sprintf("%s:%d", t.Host, t.Port) }</span>
+						<span class="text-slate-200">|</span>
+						<span class="text-xs text-slate-400">{ t.Context }</span>
+					</div>
+				</div>
+			</div>
+			<div class="flex items-center gap-2">
+				<a href={ templ.URL(fmt.Sprintf("/trunks/%d/edit", t.ID)) } class="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors">Edit</a>
+				<button
+					hx-delete={ fmt.Sprintf("/trunks/%d", t.ID) }
+					hx-target={ fmt.Sprintf("#trunk-%d", t.ID) }
+					hx-swap="outerHTML"
+					hx-confirm={ "Delete trunk " + t.Name + "?" }
+					class="rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+				>Delete</button>
+			</div>
+		</div>
+	</div>
+}
+
+templ trunkEmptyState() {
+	<div class="text-center py-16">
+		<svg class="mx-auto h-12 w-12 text-slate-300" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
+			<path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/>
+		</svg>
+		<h3 class="mt-3 text-sm font-semibold text-slate-900">No trunks yet</h3>
+		<p class="mt-1 text-sm text-slate-500">Add a SIP trunk to route calls to external providers.</p>
+		<div class="mt-6">
+			<a href="/trunks/new" class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-500 transition-colors">
+				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+				</svg>
+				New Trunk
+			</a>
+		</div>
+	</div>
+}
+
+templ TrunkForm(t *database.Trunk, isEdit bool) {
+	@layouts.Base(formTitle("Trunk", isEdit)) {
+		<div class="mx-auto max-w-2xl">
+			<div class="mb-8">
+				<h1 class="text-2xl font-bold text-slate-900">
+					if isEdit {
+						Edit Trunk { t.Name }
+					} else {
+						New Trunk
+					}
+				</h1>
+				<p class="mt-1 text-sm text-slate-500">
+					if isEdit {
+						Update the SIP trunk configuration.
+					} else {
+						Connect a SIP trunk for outbound/inbound call routing.
+					}
+				</p>
+			</div>
+
+			<form
+				if isEdit {
+					hx-put={ fmt.Sprintf("/trunks/%d", t.ID) }
+				} else {
+					hx-post="/trunks"
+				}
+				hx-target="body"
+				class="space-y-8"
+			>
+				<!-- Identity -->
+				<div class="rounded-xl bg-white shadow-sm ring-1 ring-slate-200 p-6">
+					<h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-4">Identity</h2>
+					<div class="grid grid-cols-2 gap-4">
+						<div>
+							<label for="name" class="block text-sm font-medium text-slate-700">Trunk Name</label>
+							<input type="text" name="name" id="name" value={ t.Name } required
+								class="mt-1.5 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 text-sm border px-3 py-2"
+								placeholder="my-trunk"/>
+						</div>
+						<div>
+							<label for="display_name" class="block text-sm font-medium text-slate-700">Display Name</label>
+							<input type="text" name="display_name" id="display_name" value={ t.DisplayName }
+								class="mt-1.5 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 text-sm border px-3 py-2"/>
+						</div>
+						<div>
+							<label for="provider" class="block text-sm font-medium text-slate-700">Provider</label>
+							<input type="text" name="provider" id="provider" value={ t.Provider }
+								class="mt-1.5 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 text-sm border px-3 py-2"
+								placeholder="my-provider"/>
+						</div>
+						<div>
+							<label for="context" class="block text-sm font-medium text-slate-700">Context</label>
+							<input type="text" name="context" id="context" value={ t.Context } required
+								class="mt-1.5 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 text-sm border px-3 py-2"
+								placeholder="from-trunk"/>
+						</div>
+					</div>
+				</div>
+
+				<!-- Connection -->
+				<div class="rounded-xl bg-white shadow-sm ring-1 ring-slate-200 p-6">
+					<h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-4">Connection</h2>
+					<div class="grid grid-cols-2 gap-4">
+						<div>
+							<label for="host" class="block text-sm font-medium text-slate-700">Host</label>
+							<input type="text" name="host" id="host" value={ t.Host } required
+								class="mt-1.5 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 text-sm border px-3 py-2"
+								placeholder="sip.provider.com"/>
+						</div>
+						<div>
+							<label for="port" class="block text-sm font-medium text-slate-700">Port</label>
+							<input type="number" name="port" id="port" value={ fmt.Sprintf("%d", t.Port) }
+								class="mt-1.5 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 text-sm border px-3 py-2"
+								placeholder="5060"/>
+						</div>
+						<div>
+							<label for="auth_user" class="block text-sm font-medium text-slate-700">Auth Username <span class="text-slate-400 font-normal">(optional)</span></label>
+							<input type="text" name="auth_user" id="auth_user" value={ t.AuthUser }
+								class="mt-1.5 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 text-sm border px-3 py-2"/>
+						</div>
+						<div>
+							<label for="auth_pass" class="block text-sm font-medium text-slate-700">Auth Password <span class="text-slate-400 font-normal">(optional)</span></label>
+							<input type="text" name="auth_pass" id="auth_pass" value={ t.AuthPass }
+								class="mt-1.5 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 text-sm border px-3 py-2 font-mono"/>
+						</div>
+					</div>
+				</div>
+
+				<!-- Media -->
+				<div class="rounded-xl bg-white shadow-sm ring-1 ring-slate-200 p-6">
+					<h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-4">Media</h2>
+					<label class="block text-sm font-medium text-slate-700 mb-3">Audio Codecs</label>
+					<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+						@trunkCodecCheckbox("ulaw", "G.711 u-law", t.Codecs)
+						@trunkCodecCheckbox("alaw", "G.711 A-law", t.Codecs)
+						@trunkCodecCheckbox("g722", "G.722", t.Codecs)
+						@trunkCodecCheckbox("opus", "Opus", t.Codecs)
+					</div>
+					<input type="hidden" name="codecs" id="codecs-hidden" value={ t.Codecs }/>
+				</div>
+
+				<!-- Actions -->
+				<div class="flex justify-end gap-3">
+					<a href="/trunks" class="rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 transition-colors">Cancel</a>
+					<button type="submit" class="rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-500 transition-colors">
+						if isEdit {
+							Update Trunk
+						} else {
+							Create Trunk
+						}
+					</button>
+				</div>
+			</form>
+
+			<script>
+				document.querySelector('form').addEventListener('submit', function() {
+					var checked = Array.from(document.querySelectorAll('input[name="codec"]:checked'));
+					document.getElementById('codecs-hidden').value = checked.map(function(c) { return c.value; }).join(',');
+				});
+			</script>
+		</div>
+	}
+}
+
+templ trunkCodecCheckbox(value, label, currentCodecs string) {
+	<label class={ "relative flex items-center rounded-lg border p-3 cursor-pointer hover:bg-slate-50 transition-colors",
+		templ.KV("border-brand-500 bg-brand-50 ring-1 ring-brand-500", trunkHasCodec(currentCodecs, value)),
+		templ.KV("border-slate-200", !trunkHasCodec(currentCodecs, value)) }>
+		<input type="checkbox" name="codec" value={ value }
+			if trunkHasCodec(currentCodecs, value) { checked }
+			class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"/>
+		<span class="ml-3 text-sm font-medium text-slate-900">{ label }</span>
+	</label>
+}
+
+func trunkHasCodec(codecList, codec string) bool {
+	for _, c := range strings.Split(codecList, ",") {
+		if strings.TrimSpace(c) == codec {
+			return true
+		}
+	}
+	return false
+}

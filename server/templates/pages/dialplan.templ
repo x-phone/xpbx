@@ -1,0 +1,429 @@
+package pages
+
+import (
+	"fmt"
+	"github.com/x-phone/xpbx/server/internal/database"
+	"github.com/x-phone/xpbx/server/internal/dialplan"
+	"github.com/x-phone/xpbx/server/templates/layouts"
+)
+
+templ DialplanSimple(groups []dialplan.ContextGroup) {
+	@layouts.Base("Routing") {
+		<div class="space-y-6">
+			<div class="flex items-center justify-between">
+				<div>
+					<h1 class="text-2xl font-bold text-slate-900">Routing</h1>
+					<p class="mt-1 text-sm text-slate-500">How calls are routed through your PBX.</p>
+				</div>
+				<div class="flex items-center gap-3">
+					@modeToggle(false)
+					<a href="/dialplan/new" class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-500 transition-colors">
+						<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+						</svg>
+						New Rule
+					</a>
+				</div>
+			</div>
+
+			if len(groups) == 0 {
+				<div class="text-center py-16">
+					<svg class="mx-auto h-12 w-12 text-slate-300" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3.75H6A2.25 2.25 0 0 0 3.75 6v1.5M16.5 3.75H18A2.25 2.25 0 0 1 20.25 6v1.5m0 9V18A2.25 2.25 0 0 1 18 20.25h-1.5m-9 0H6A2.25 2.25 0 0 1 3.75 18v-1.5M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>
+					</svg>
+					<h3 class="mt-3 text-sm font-semibold text-slate-900">No routing rules</h3>
+					<p class="mt-1 text-sm text-slate-500">Create extensions first, then add routing rules.</p>
+				</div>
+			} else {
+				for _, g := range groups {
+					@contextGroupCard(g)
+				}
+			}
+		</div>
+	}
+}
+
+templ DialplanAdvanced(rules []database.DialplanRule) {
+	@layouts.Base("Dialplan") {
+		<div class="space-y-6">
+			<div class="flex items-center justify-between">
+				<div>
+					<h1 class="text-2xl font-bold text-slate-900">Dialplan Rules</h1>
+					<p class="mt-1 text-sm text-slate-500">Raw Asterisk Realtime dialplan entries.</p>
+				</div>
+				<div class="flex items-center gap-3">
+					@modeToggle(true)
+					<a href="/dialplan/new" class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-500 transition-colors">
+						<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+						</svg>
+						New Rule
+					</a>
+				</div>
+			</div>
+
+			if len(rules) == 0 {
+				<div class="text-center py-16">
+					<p class="text-sm text-slate-500">No dialplan rules configured.</p>
+				</div>
+			} else {
+				<div class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+					<table class="min-w-full divide-y divide-slate-200">
+						<thead class="bg-slate-50">
+							<tr>
+								<th class="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Context</th>
+								<th class="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Extension</th>
+								<th class="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Pri</th>
+								<th class="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">App</th>
+								<th class="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Data</th>
+								<th class="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider"></th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-slate-100">
+							for _, r := range rules {
+								@DialplanRow(r)
+							}
+						</tbody>
+					</table>
+				</div>
+			}
+		</div>
+	}
+}
+
+templ modeToggle(isAdvanced bool) {
+	<div class="inline-flex rounded-lg bg-slate-100 p-0.5">
+		<a
+			href="/dialplan"
+			class={ "rounded-md px-3 py-1.5 text-xs font-semibold transition-colors",
+				templ.KV("bg-white text-slate-900 shadow-sm", !isAdvanced),
+				templ.KV("text-slate-500 hover:text-slate-700", isAdvanced) }
+		>
+			Simple
+		</a>
+		<a
+			href="/dialplan?mode=advanced"
+			class={ "rounded-md px-3 py-1.5 text-xs font-semibold transition-colors",
+				templ.KV("bg-white text-slate-900 shadow-sm", isAdvanced),
+				templ.KV("text-slate-500 hover:text-slate-700", !isAdvanced) }
+		>
+			Advanced
+		</a>
+	</div>
+}
+
+templ contextGroupCard(g dialplan.ContextGroup) {
+	<div class="rounded-xl bg-white shadow-sm ring-1 ring-slate-200 overflow-hidden">
+		<div class="border-b border-slate-100 bg-slate-50/50 px-6 py-3 flex items-center justify-between">
+			<div class="flex items-center gap-2.5">
+				<h2 class="text-sm font-semibold text-slate-900">{ g.Label }</h2>
+				<code class="rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-mono text-slate-500">{ g.Context }</code>
+			</div>
+			<span class="text-xs text-slate-400">{ fmt.Sprintf("%d rule(s)", len(g.Rules)) }</span>
+		</div>
+		<div class="divide-y divide-slate-50">
+			for _, rule := range g.Rules {
+				@routingRuleRow(rule)
+			}
+		</div>
+	</div>
+}
+
+templ routingRuleRow(rule dialplan.RoutingRule) {
+	<div class="px-6 py-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
+		<div class="flex items-center gap-4 min-w-0">
+			@ruleIcon(rule.Type)
+			<div class="min-w-0">
+				<div class="flex items-center gap-2">
+					<span class="font-mono text-sm font-bold text-slate-900">{ rule.Pattern }</span>
+					@ruleTypeBadge(rule.Type)
+				</div>
+				<p class="text-sm text-slate-500 mt-0.5">{ rule.Label }</p>
+			</div>
+		</div>
+		<div class="flex items-center gap-4 shrink-0 text-xs text-slate-400">
+			if rule.Timeout > 0 {
+				<span>{ fmt.Sprintf("%ds", rule.Timeout) }</span>
+			}
+			<span class="tabular-nums">{ fmt.Sprintf("%d rows", len(rule.Rows)) }</span>
+		</div>
+	</div>
+}
+
+templ ruleIcon(ruleType dialplan.RuleType) {
+	switch ruleType {
+		case "ring_extension":
+			<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
+				<svg class="h-5 w-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 0 1-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 0 0-1.091-.852H4.5A2.25 2.25 0 0 0 2.25 4.5v2.25Z"/>
+				</svg>
+			</div>
+		case "ring_voicemail":
+			<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-50">
+				<svg class="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M21.75 9v.906a2.25 2.25 0 0 1-1.183 1.981l-6.478 3.488M2.25 9v.906a2.25 2.25 0 0 0 1.183 1.981l6.478 3.488m8.839 2.51-4.66-2.51m0 0-1.023-.55a2.25 2.25 0 0 0-2.134 0l-1.022.55m0 0-4.661 2.51m16.5-1.875a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm-1.125 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z"/>
+				</svg>
+			</div>
+		case "voicemail_only":
+			<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-50">
+				<svg class="h-5 w-5 text-violet-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"/>
+				</svg>
+			</div>
+		case "route_to_trunk":
+			<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50">
+				<svg class="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"/>
+				</svg>
+			</div>
+		case "inbound_route":
+			<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-cyan-50">
+				<svg class="h-5 w-5 text-cyan-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M9 3.75H6.912a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H15M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859"/>
+				</svg>
+			</div>
+		default:
+			<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-50">
+				<svg class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5"/>
+				</svg>
+			</div>
+	}
+}
+
+templ ruleTypeBadge(ruleType dialplan.RuleType) {
+	switch ruleType {
+		case "ring_extension":
+			<span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Ring</span>
+		case "ring_voicemail":
+			<span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">Ring + VM</span>
+		case "voicemail_only":
+			<span class="inline-flex items-center rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700">Voicemail</span>
+		case "route_to_trunk":
+			<span class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">Trunk</span>
+		case "inbound_route":
+			<span class="inline-flex items-center rounded-full bg-cyan-50 px-2 py-0.5 text-xs font-medium text-cyan-700">Inbound</span>
+		default:
+			<span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">Custom</span>
+	}
+}
+
+templ DialplanRow(r database.DialplanRule) {
+	<tr id={ fmt.Sprintf("rule-%d", r.ID) } class="hover:bg-slate-50/50 transition-colors">
+		<td class="px-6 py-3 whitespace-nowrap text-sm font-medium text-slate-900">{ r.Context }</td>
+		<td class="px-6 py-3 whitespace-nowrap text-sm font-mono text-slate-600">{ r.Exten }</td>
+		<td class="px-6 py-3 whitespace-nowrap text-sm text-slate-500">{ fmt.Sprintf("%d", r.Priority) }</td>
+		<td class="px-6 py-3 whitespace-nowrap text-sm">
+			<span class="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700">{ r.App }</span>
+		</td>
+		<td class="px-6 py-3 text-sm font-mono text-slate-500 max-w-xs truncate">{ r.AppData }</td>
+		<td class="px-6 py-3 whitespace-nowrap text-right text-sm">
+			<a href={ templ.URL(fmt.Sprintf("/dialplan/%d/edit", r.ID)) } class="text-slate-500 hover:text-brand-600 mr-3">Edit</a>
+			<button
+				hx-delete={ fmt.Sprintf("/dialplan/%d", r.ID) }
+				hx-target={ fmt.Sprintf("#rule-%d", r.ID) }
+				hx-swap="outerHTML"
+				hx-confirm="Delete this dialplan rule?"
+				class="text-slate-500 hover:text-red-600"
+			>Delete</button>
+		</td>
+	</tr>
+}
+
+templ DialplanForm(r *database.DialplanRule, isEdit bool) {
+	@layouts.Base(formTitle("Dialplan Rule", isEdit)) {
+		<div class="mx-auto max-w-2xl" x-data={ fmt.Sprintf("dialplanForm('%s')", r.App) }>
+			<div class="mb-8">
+				<h1 class="text-2xl font-bold text-slate-900">
+					if isEdit {
+						Edit Dialplan Rule
+					} else {
+						New Dialplan Rule
+					}
+				</h1>
+				<p class="mt-1 text-sm text-slate-500">Configure a single step in your call routing logic.</p>
+			</div>
+
+			<!-- Quick-start hint for new users -->
+			if !isEdit {
+				<div class="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+					<div class="flex gap-3">
+						<svg class="h-5 w-5 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18"/>
+						</svg>
+						<div class="text-sm text-amber-800">
+							<p class="font-semibold">How dialplan rules work</p>
+							<p class="mt-1 text-amber-700">Each rule is one step in a sequence. When someone dials a number, Asterisk runs all rules matching that <strong>context</strong> + <strong>extension</strong>, ordered by <strong>priority</strong> (1, 2, 3...).</p>
+							<p class="mt-1 text-amber-700">A typical call needs 3 rules: <code class="bg-amber-100 px-1 rounded">NoOp</code> (log) → <code class="bg-amber-100 px-1 rounded">Dial</code> (ring) → <code class="bg-amber-100 px-1 rounded">Hangup</code> (cleanup).</p>
+						</div>
+					</div>
+				</div>
+			}
+
+			<form
+				if isEdit {
+					hx-put={ fmt.Sprintf("/dialplan/%d", r.ID) }
+				} else {
+					hx-post="/dialplan"
+				}
+				hx-target="body"
+				class="space-y-6"
+			>
+				<!-- Where & When -->
+				<div class="rounded-xl bg-white shadow-sm ring-1 ring-slate-200 p-6">
+					<h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-4">Match</h2>
+					<div class="grid grid-cols-3 gap-4">
+						<div>
+							<label for="context" class="block text-sm font-medium text-slate-700">Context</label>
+							<p class="text-xs text-slate-400 mt-0.5">Where the call comes from.</p>
+							<input type="text" name="context" id="context" value={ r.Context } required
+								class="mt-1.5 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 text-sm border px-3 py-2"
+								placeholder="from-internal"/>
+						</div>
+						<div>
+							<label for="exten" class="block text-sm font-medium text-slate-700">Extension Pattern</label>
+							<p class="text-xs text-slate-400 mt-0.5">Number or pattern to match.</p>
+							<input type="text" name="exten" id="exten" value={ r.Exten } required
+								class="mt-1.5 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 text-sm border px-3 py-2 font-mono"
+								placeholder="1001"/>
+						</div>
+						<div>
+							<label for="priority" class="block text-sm font-medium text-slate-700">Priority</label>
+							<p class="text-xs text-slate-400 mt-0.5">Step order (1, 2, 3...).</p>
+							<input type="number" name="priority" id="priority" value={ fmt.Sprintf("%d", r.Priority) } required min="1"
+								class="mt-1.5 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 text-sm border px-3 py-2"/>
+						</div>
+					</div>
+					<!-- Pattern cheat sheet -->
+					<details class="mt-4">
+						<summary class="text-xs font-medium text-brand-600 cursor-pointer hover:text-brand-700">Pattern cheat sheet</summary>
+						<div class="mt-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-600 space-y-1 font-mono">
+							<div class="grid grid-cols-2 gap-x-6 gap-y-1">
+								<div><span class="text-slate-900 font-semibold">1001</span> — exact match</div>
+								<div><span class="text-slate-900 font-semibold">_X.</span> — any number, any length</div>
+								<div><span class="text-slate-900 font-semibold">_2XXX</span> — 2000 through 2999</div>
+								<div><span class="text-slate-900 font-semibold">_1[0-5]XX</span> — 1000 through 1599</div>
+								<div><span class="text-slate-900 font-semibold">_NXXXXXX</span> — 7-digit (N = 2-9)</div>
+								<div><span class="text-slate-900 font-semibold">_+1NXXNXXXXXX</span> — US E.164</div>
+							</div>
+						</div>
+					</details>
+				</div>
+
+				<!-- Action -->
+				<div class="rounded-xl bg-white shadow-sm ring-1 ring-slate-200 p-6">
+					<h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-4">Action</h2>
+					<div class="space-y-4">
+						<div>
+							<label for="app" class="block text-sm font-medium text-slate-700">Application</label>
+							<p class="text-xs text-slate-400 mt-0.5">What to do when this step runs.</p>
+							<select name="app" id="app" required x-model="app"
+								class="mt-1.5 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 text-sm border px-3 py-2">
+								<option value="">Choose an application...</option>
+								<optgroup label="Call Routing">
+									<option value="Dial">Dial — Ring a phone or trunk</option>
+									<option value="Queue">Queue — Send to call queue</option>
+									<option value="Goto">Goto — Jump to another rule</option>
+									<option value="GotoIf">GotoIf — Conditional jump</option>
+								</optgroup>
+								<optgroup label="Audio &amp; Prompts">
+									<option value="Answer">Answer — Pick up the call</option>
+									<option value="Playback">Playback — Play a sound file</option>
+									<option value="Background">Background — Play audio, listen for keys</option>
+									<option value="SayDigits">SayDigits — Speak digits</option>
+									<option value="SayNumber">SayNumber — Speak a number</option>
+								</optgroup>
+								<optgroup label="IVR &amp; Input">
+									<option value="Read">Read — Collect key presses</option>
+									<option value="WaitExten">WaitExten — Wait for extension dialed</option>
+								</optgroup>
+								<optgroup label="Voicemail">
+									<option value="VoiceMail">VoiceMail — Send to voicemail</option>
+									<option value="VoiceMailMain">VoiceMailMain — Check voicemail</option>
+								</optgroup>
+								<optgroup label="Conference &amp; Recording">
+									<option value="ConfBridge">ConfBridge — Conference room</option>
+									<option value="Record">Record — Record audio</option>
+									<option value="MixMonitor">MixMonitor — Record both sides</option>
+								</optgroup>
+								<optgroup label="Utility">
+									<option value="NoOp">NoOp — Log / debug message</option>
+									<option value="Wait">Wait — Pause for seconds</option>
+									<option value="Set">Set — Set a variable</option>
+									<option value="Hangup">Hangup — End the call</option>
+								</optgroup>
+							</select>
+						</div>
+
+						<!-- App description -->
+						<div x-show="appInfo[app]" x-cloak
+							class="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+							<div class="flex gap-3">
+								<svg class="h-4 w-4 text-blue-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/>
+								</svg>
+								<div class="text-sm">
+									<p class="text-blue-800" x-text="appInfo[app]?.desc"></p>
+									<p class="mt-1 text-blue-600 font-mono text-xs" x-show="appInfo[app]?.example">
+										<span class="font-sans font-medium">Example:</span> <span x-text="appInfo[app]?.example"></span>
+									</p>
+								</div>
+							</div>
+						</div>
+
+						<!-- App Data -->
+						<div x-show="app && app !== 'Hangup'" x-cloak>
+							<label for="appdata" class="block text-sm font-medium text-slate-700">Application Data</label>
+							<p class="text-xs text-slate-400 mt-0.5" x-text="appInfo[app]?.dataHint || 'Arguments passed to the application.'"></p>
+							<input type="text" name="appdata" id="appdata" value={ r.AppData }
+								class="mt-1.5 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 text-sm border px-3 py-2 font-mono"
+								x-bind:placeholder="appInfo[app]?.placeholder || ''"/>
+						</div>
+					</div>
+				</div>
+
+				<!-- Actions -->
+				<div class="flex justify-end gap-3">
+					<a href="/dialplan" class="rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 transition-colors">Cancel</a>
+					<button type="submit" class="rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-500 transition-colors">
+						if isEdit {
+							Update Rule
+						} else {
+							Create Rule
+						}
+					</button>
+				</div>
+			</form>
+
+			<script>
+				function dialplanForm(initial) {
+					return {
+						app: initial || '',
+						appInfo: {
+							'Dial':          { desc: 'Ring a SIP phone or route through a trunk. Supports timeout and options.', dataHint: 'Target device and timeout in seconds.', placeholder: 'PJSIP/1001,20', example: 'PJSIP/1001,20  or  PJSIP/my-trunk/+15551234567,30' },
+							'Queue':         { desc: 'Place the caller into a call queue. Agents in the queue will be rung.', dataHint: 'Queue name and options.', placeholder: 'support,t', example: 'support,t  (queue named "support", allow transfer)' },
+							'Goto':          { desc: 'Jump execution to a different context, extension, or priority.', dataHint: 'Target as context,extension,priority.', placeholder: 'from-internal,1001,1', example: 'from-internal,1001,1' },
+							'GotoIf':        { desc: 'Conditional branch — jump to different targets based on an expression.', dataHint: 'Condition ? true-target : false-target.', placeholder: '$[${CALLERID(num)}=1001]?yes,1:no,1', example: '$[${CALLERID(num)}=1001]?allowed,1:denied,1' },
+							'Answer':        { desc: 'Answer the incoming call. Required before playing audio or recording.', dataHint: 'Optional delay in ms before answering.', placeholder: '', example: '(no arguments needed)' },
+							'Playback':      { desc: 'Play a sound file to the caller. The caller cannot press keys to interrupt.', dataHint: 'Sound file name (without extension).', placeholder: 'welcome', example: 'hello-world  or  custom/my-greeting' },
+							'Background':    { desc: 'Play audio while listening for DTMF key presses. Great for IVR menus.', dataHint: 'Sound file name.', placeholder: 'main-menu', example: 'press-1-for-sales' },
+							'SayDigits':     { desc: 'Speak each digit individually (e.g. 123 → "one two three").', dataHint: 'Digits to speak.', placeholder: '${CALLERID(num)}', example: '12345' },
+							'SayNumber':     { desc: 'Speak a number naturally (e.g. 123 → "one hundred twenty-three").', dataHint: 'Number to speak.', placeholder: '42', example: '42' },
+							'Read':          { desc: 'Collect DTMF key presses from the caller into a variable.', dataHint: 'Variable name, prompt file, max digits.', placeholder: 'RESULT,,4', example: 'PIN,enter-pin,4  (store in PIN, play prompt, 4 digits max)' },
+							'WaitExten':     { desc: 'Wait for the caller to dial an extension number. Used after Background.', dataHint: 'Timeout in seconds.', placeholder: '10', example: '10  (wait up to 10 seconds)' },
+							'VoiceMail':     { desc: 'Send the caller to a mailbox to leave a voicemail message.', dataHint: 'Mailbox@context.', placeholder: '1001@default', example: '1001@default' },
+							'VoiceMailMain': { desc: 'Let the caller check and manage their voicemail.', dataHint: 'Mailbox@context.', placeholder: '${CALLERID(num)}@default', example: '1001@default' },
+							'ConfBridge':    { desc: 'Join the caller into a conference bridge room.', dataHint: 'Conference room number or name.', placeholder: '1', example: '1  (join room 1)' },
+							'Record':        { desc: 'Record audio from the caller to a file.', dataHint: 'Filename with format, silence timeout, max duration.', placeholder: '/tmp/recording.wav,3,60', example: '/tmp/msg.wav,3,60  (WAV, 3s silence stop, 60s max)' },
+							'MixMonitor':    { desc: 'Record both sides of a live call. Start before Dial to capture the conversation.', dataHint: 'Filename and options.', placeholder: '/tmp/call.wav', example: '/tmp/call.wav,b  (record both directions)' },
+							'NoOp':          { desc: 'Does nothing — just logs a message to the Asterisk console. Useful for debugging.', dataHint: 'Message to log.', placeholder: 'Calling extension ${EXTEN}', example: 'Calling extension ${EXTEN}' },
+							'Wait':          { desc: 'Pause execution for a number of seconds.', dataHint: 'Number of seconds.', placeholder: '2', example: '2  (pause 2 seconds)' },
+							'Set':           { desc: 'Set a channel variable that can be used in later steps.', dataHint: 'VARIABLE=value.', placeholder: 'TIMEOUT(absolute)=300', example: 'CDR(accountcode)=sales' },
+							'Hangup':        { desc: 'End the call and free all resources. Usually the last step.', dataHint: '', placeholder: '', example: '(no arguments needed)' }
+						}
+					};
+				}
+			</script>
+		</div>
+	}
+}
