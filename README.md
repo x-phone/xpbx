@@ -2,6 +2,8 @@
 
 Self-hosted PBX with a web UI. Manages Asterisk via SQLite Realtime and ARI.
 
+> **Note:** This project is in early development and intended for **development and testing purposes only**. It is not yet hardened for production use.
+
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 ## What it does
