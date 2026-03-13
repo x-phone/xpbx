@@ -151,6 +151,132 @@ xpbx/
 - **SQLite** in WAL mode (shared between xpbx and Asterisk)
 - **Asterisk** with pjsip and Realtime architecture
 
+## API Reference
+
+xpbx exposes a web UI and a set of HTTP endpoints for managing extensions, trunks, and dialplan rules. Most endpoints return HTML (designed for HTMX), but can be called from any HTTP client.
+
+All write operations use **form-encoded** request bodies (`application/x-www-form-urlencoded`).
+
+### Extensions
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/extensions` | List all extensions |
+| `GET` | `/extensions/new` | New extension form |
+| `GET` | `/extensions/{id}/edit` | Edit extension form |
+| `POST` | `/extensions` | Create extension |
+| `PUT` | `/extensions/{id}` | Update extension |
+| `DELETE` | `/extensions/{id}` | Delete extension |
+
+**Create / Update fields:**
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `extension` | yes | — | Extension number (e.g. `1001`) |
+| `password` | yes | — | SIP auth password |
+| `context` | yes | `from-internal` | Dialplan context |
+| `display_name` | no | — | Friendly name |
+| `codecs` | no | `ulaw` | Comma-separated codec list |
+| `max_contacts` | no | `10` | Max simultaneous registrations |
+| `routing_enabled` | no | `on` | Enable call routing rules |
+| `routing_pattern` | no | `ring_voicemail` | One of: `ring_only`, `ring_voicemail`, `voicemail_only` |
+| `routing_timeout` | no | `20` | Ring timeout in seconds |
+| `vm_enabled` | no | `on` | Enable voicemail |
+| `vm_pin` | no | `0000` | Voicemail access PIN |
+| `vm_email` | no | — | Email for voicemail notifications |
+
+**Example — create an extension:**
+
+```bash
+curl -X POST http://localhost:8080/extensions \
+  -d "extension=1004&password=secret4&context=from-internal&display_name=Office+Phone&codecs=ulaw,g722"
+```
+
+### Trunks
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/trunks` | List all trunks |
+| `GET` | `/trunks/new` | New trunk form |
+| `GET` | `/trunks/{id}/edit` | Edit trunk form |
+| `POST` | `/trunks` | Create trunk |
+| `PUT` | `/trunks/{id}` | Update trunk |
+| `DELETE` | `/trunks/{id}` | Delete trunk |
+
+**Create / Update fields:**
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `name` | yes | — | Trunk identifier (unique) |
+| `host` | yes | — | SIP server hostname or IP |
+| `context` | yes | `from-trunk` | Dialplan context for inbound calls |
+| `display_name` | no | — | Friendly name |
+| `provider` | no | — | Provider name (informational) |
+| `port` | no | `5060` | SIP port |
+| `auth_user` | no | — | SIP authentication username |
+| `auth_pass` | no | — | SIP authentication password |
+| `codecs` | no | `ulaw` | Comma-separated codec list |
+
+**Example — create a trunk:**
+
+```bash
+curl -X POST http://localhost:8080/trunks \
+  -d "name=my-provider&host=sip.provider.com&context=from-trunk&auth_user=myuser&auth_pass=mypass"
+```
+
+### Dialplan
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/dialplan` | List rules (simple view) |
+| `GET` | `/dialplan?mode=advanced` | List rules (raw table view) |
+| `GET` | `/dialplan/new` | New rule form |
+| `GET` | `/dialplan/{id}/edit` | Edit rule form |
+| `POST` | `/dialplan` | Create rule |
+| `PUT` | `/dialplan/{id}` | Update rule |
+| `DELETE` | `/dialplan/{id}` | Delete rule |
+
+**Create / Update fields:**
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `context` | yes | `from-internal` | Dialplan context |
+| `exten` | yes | — | Extension pattern (e.g. `1001`, `_2XXX`, `_NXXXXXX`) |
+| `priority` | yes | `1` | Execution order |
+| `app` | yes | — | Asterisk application (`Dial`, `VoiceMail`, `Hangup`, etc.) |
+| `appdata` | no | — | Application arguments (e.g. `PJSIP/1001,20`) |
+
+**Example — create a dialplan rule:**
+
+```bash
+curl -X POST http://localhost:8080/dialplan \
+  -d "context=from-internal&exten=_9NXXXXXX&priority=1&app=Dial&appdata=PJSIP/my-provider/\${EXTEN:1}"
+```
+
+### Dashboard & System
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/dashboard` | Dashboard page |
+| `GET` | `/partials/system-info` | Asterisk system info (HTML partial, polled every 10s) |
+| `GET` | `/partials/registrations` | Registered SIP endpoints (HTML partial, polled every 5s) |
+| `GET` | `/partials/active-calls` | Active call channels (HTML partial, polled every 5s) |
+| `GET` | `/partials/sip-config/{id}` | SIP configuration modal for extension |
+| `DELETE` | `/api/calls/{channelId}` | Hang up an active call |
+| `POST` | `/api/asterisk/reload` | Reload Asterisk PJSIP module |
+
+**Example — hang up a call:**
+
+```bash
+curl -X DELETE http://localhost:8080/api/calls/1234567890.42
+```
+
+**Example — reload PJSIP:**
+
+```bash
+curl -X POST http://localhost:8080/api/asterisk/reload
+```
+
 ## Part of x-phone
 
 xpbx is the PBX component of the [x-phone](https://github.com/x-phone) ecosystem:
