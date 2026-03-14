@@ -25,7 +25,9 @@ make up
 
 Open **http://localhost:8080** — the web UI is ready.
 
-Register a SIP phone (Obi200, Obi2182, Linphone, Obi100, etc.) to `your-ip:5060` with one of the seeded extensions (1001/1001, 1002/1002, 1003/1003).
+Register a SIP phone (Obi200, Obi2182, Linphone, Obi100, etc.) to `your-ip:5060` with one of the seeded extensions (1001/1002/1003, password: `password123`).
+
+A sample SIP trunk (`my-provider` → `sip.example.com`) and outbound route (`9 + 10 digits`) are also seeded — edit them in the UI with your real provider details.
 
 ### Network / NAT
 
@@ -89,6 +91,23 @@ All configuration is via environment variables in `docker-compose.yml`:
 | `ARI_PASSWORD` | `secret` | ARI password |
 | `LOG_LEVEL` | `info` | Log level (debug, info, warn, error) |
 | `SIP_PORT` | `5060` | SIP port shown in dashboard |
+| `VOICEWORKER_HOST` | *(empty/disabled)* | When set, creates voiceworker trunk pointed at this host:port |
+| `VOICEWORKER_EXTEN` | `2000` | Extension number that routes to voiceworker trunk |
+
+### Asterisk config overrides
+
+The default Asterisk configuration works out of the box. For advanced use cases, you can override any config file via volume mounts:
+
+```yaml
+# docker-compose.override.yml
+services:
+  asterisk:
+    volumes:
+      - ./my-pjsip.conf:/etc/asterisk/pjsip.conf:ro
+      - ./my-extensions.conf:/etc/asterisk/extensions.conf:ro
+```
+
+> **Note:** Most common customizations (NAT, voiceworker trunk, xbridge integration) are handled by environment variables and don't require config overrides.
 
 ## Make targets
 
@@ -285,7 +304,17 @@ xpbx is the PBX component of the [x-phone](https://github.com/x-phone) ecosystem
 - **xbridge** — Programmable voice gateway (Twilio-compatible API)
 - **xphone-go** — Go SIP client library
 
-Connect xpbx to xbridge via SIP trunks for programmable voice, external PSTN routing, and webhook-driven call control.
+### xbridge integration
+
+To connect xpbx to [xbridge](https://github.com/x-phone/xbridge) for voice AI, set `VOICEWORKER_HOST` in your `.env` or `docker-compose.yml`:
+
+```yaml
+environment:
+  - VOICEWORKER_HOST=xbridge:5080
+  - VOICEWORKER_EXTEN=2000        # optional, default is 2000
+```
+
+This auto-generates a voiceworker SIP trunk and a dialplan route so that dialing extension 2000 from any registered phone reaches xbridge. No config file overrides needed.
 
 ## License
 

@@ -617,13 +617,22 @@ func TestSeed(t *testing.T) {
 		t.Errorf("seed created %d extensions, want 3", len(exts))
 	}
 
-	// Check dialplan rules created (3 per extension = 9)
+	// Check dialplan rules created (3 per extension = 9, plus 3 outbound trunk route = 12)
 	rules, err := db.ListDialplanRules()
 	if err != nil {
 		t.Fatalf("list rules: %v", err)
 	}
-	if len(rules) != 9 {
-		t.Errorf("seed created %d rules, want 9", len(rules))
+	if len(rules) != 12 {
+		t.Errorf("seed created %d rules, want 12", len(rules))
+	}
+
+	// Check trunk created
+	trunks, err := db.ListTrunks()
+	if err != nil {
+		t.Fatalf("list trunks: %v", err)
+	}
+	if len(trunks) != 1 {
+		t.Errorf("seed created %d trunks, want 1", len(trunks))
 	}
 
 	// Seed again — should be idempotent

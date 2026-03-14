@@ -28,7 +28,9 @@ services:
       - xpbx-data:/data
     environment:
       - SYSLOG_LEVEL=4
-      - EXTERNAL_IP=${EXTERNAL_IP:-}   # Auto-detected via STUN if empty
+      - EXTERNAL_IP=${EXTERNAL_IP:-}           # Auto-detected via STUN if empty
+      - VOICEWORKER_HOST=${VOICEWORKER_HOST:-}  # Set to host:port to create voiceworker trunk
+      - VOICEWORKER_EXTEN=${VOICEWORKER_EXTEN:-2000}
     networks:
       - xpbx-network
 

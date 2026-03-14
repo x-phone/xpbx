@@ -18,5 +18,9 @@ server/xpbx
 *.db-wal
 *.db-shm
 
+# Auto-generated Asterisk configs (written by entrypoint.sh at runtime)
+asterisk/config/pjsip_voiceworker.conf
+asterisk/config/extensions_voiceworker.conf
+
 # Environment
 .env
