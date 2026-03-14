@@ -1,6 +1,8 @@
 package database
 
 import (
+	"fmt"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -52,6 +54,35 @@ func (db *DB) Seed() error {
 		}
 	}
 	log.WithField("count", len(rules)).Info("Seeded dialplan rules")
+
+	// Sample SIP trunk — users can edit this in the UI with their real provider details
+	trunk := Trunk{
+		Name:        "my-provider",
+		DisplayName: "Sample Trunk (edit me)",
+		Provider:    "Example",
+		Host:        "sip.example.com",
+		Port:        5060,
+		Context:     "from-trunk",
+		Transport:   "transport-udp",
+		Codecs:      "ulaw",
+	}
+	if err := db.CreateTrunk(&trunk); err != nil {
+		return err
+	}
+	log.WithField("trunk", trunk.Name).Info("Seeded sample trunk")
+
+	// Outbound dialplan rule — route 9+10-digit numbers via the sample trunk
+	outboundRules := []DialplanRule{
+		{Context: "from-internal", Exten: "_9NXXNXXXXXX", Priority: 1, App: "NoOp", AppData: fmt.Sprintf("Outbound call via trunk %s", trunk.Name)},
+		{Context: "from-internal", Exten: "_9NXXNXXXXXX", Priority: 2, App: "Dial", AppData: fmt.Sprintf("PJSIP/${EXTEN:1}@%s,30", trunk.Name)},
+		{Context: "from-internal", Exten: "_9NXXNXXXXXX", Priority: 3, App: "Hangup", AppData: ""},
+	}
+	for i := range outboundRules {
+		if err := db.CreateDialplanRule(&outboundRules[i]); err != nil {
+			return err
+		}
+	}
+	log.WithField("pattern", "_9NXXNXXXXXX").Info("Seeded outbound trunk route")
 
 	return nil
 }
