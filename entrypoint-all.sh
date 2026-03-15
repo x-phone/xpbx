@@ -132,7 +132,8 @@ XPBX_PID=$!
 
 echo "xpbx ready — SIP on :5060, Web UI on :8080"
 
-# Wait for either process to exit
-wait -n $ASTERISK_PID $XPBX_PID 2>/dev/null || true
-kill $ASTERISK_PID $XPBX_PID 2>/dev/null
-wait
+# Shutdown handler: kill both processes on signal
+trap 'kill $ASTERISK_PID $XPBX_PID 2>/dev/null; wait' TERM INT
+
+# Wait forever (both are backgrounded)
+wait $ASTERISK_PID $XPBX_PID
