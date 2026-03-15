@@ -113,7 +113,7 @@ ln -sfn "$SOUNDS_DATA" "$SOUNDS_DIR"
 # --- Start services ---
 
 # Start Asterisk with a pseudo-TTY (prevents CPU spin from console without TTY)
-script -q -c "/usr/sbin/asterisk -f" /dev/null &
+script -q -c "/usr/sbin/asterisk -f" /dev/null > /dev/null 2>&1 &
 ASTERISK_PID=$!
 
 sleep 2
