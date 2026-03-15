@@ -10,9 +10,9 @@ exec() { :; }
 unset -f exec
 
 # --- Start Asterisk ---
-# Redirect stdout to suppress NUL byte flood when running without a TTY.
-# Asterisk logs go through logger.conf (syslog/files), not stdout.
-/usr/sbin/asterisk -fp > /dev/null 2>&1 &
+# Asterisk's console mode spins at 100% CPU without a TTY (tight select() loop on stdin).
+# Use `script` to provide a pseudo-TTY, suppress all output (logs go through logger.conf).
+script -qfc "/usr/sbin/asterisk -fp" /dev/null > /dev/null 2>&1 &
 ASTERISK_PID=$!
 
 # Wait for Asterisk to be ready
