@@ -2,25 +2,16 @@ FROM andrius/asterisk:latest
 
 ARG TARGETARCH
 
-# Install ca-certificates and curl (for sound downloads in entrypoint)
-RUN apk add --no-cache ca-certificates curl python3
-
 # Asterisk config
 COPY asterisk/config/ /etc/asterisk/
 COPY asterisk/scripts/entrypoint.sh /scripts/entrypoint.sh
-RUN chmod +x /scripts/entrypoint.sh
 
 # xpbx web server
-WORKDIR /app
-COPY docker-bin/linux-${TARGETARCH}/xpbx .
-COPY server/static ./static
-
-# Shared data volume
-RUN mkdir -p /data
-
-EXPOSE 5060/udp 5060/tcp 8080 10000-10099/udp
+COPY docker-bin/linux-${TARGETARCH}/xpbx /app/xpbx
+COPY server/static /app/static
 
 COPY entrypoint-all.sh /entrypoint-all.sh
-RUN chmod +x /entrypoint-all.sh
+
+EXPOSE 5060/udp 5060/tcp 8080 10000-10099/udp
 
 ENTRYPOINT ["/entrypoint-all.sh"]
