@@ -17,15 +17,30 @@ Self-hosted PBX with a web UI. Manages Asterisk via SQLite Realtime and ARI.
 
 ## Quick start
 
+### Docker (no clone needed)
+
+```bash
+docker run -d --name xpbx \
+  -p 5060:5060/udp -p 5060:5060/tcp \
+  -p 8080:8080 \
+  -p 10000-10099:10000-10099/udp \
+  -e EXTERNAL_IP=$(tailscale ip -4) \
+  ghcr.io/x-phone/xpbx:latest
+```
+
+### Docker Compose (for development)
+
 ```bash
 git clone https://github.com/x-phone/xpbx.git
 cd xpbx
 make up
 ```
 
+---
+
 Open **http://localhost:8080** — the web UI is ready.
 
-Register a SIP phone (Obi200, Obi2182, Linphone, Obi100, etc.) to `your-ip:5060` with one of the seeded extensions (1001/1002/1003, password: `password123`).
+Register a SIP phone (Zoiper, Linphone, Obi200, etc.) to `your-ip:5060` with one of the seeded extensions (1001/1002/1003, password: `password123`).
 
 A sample SIP trunk (`my-provider` → `sip.example.com`) and outbound route (`9 + 10 digits`) are also seeded — edit them in the UI with your real provider details.
 
@@ -36,14 +51,22 @@ A sample SIP trunk (`my-provider` → `sip.example.com`) and outbound route (`9 
 Override for specific network setups:
 
 ```bash
-# Tailscale / VPN
+# Docker — Tailscale / VPN
+docker run -d --name xpbx \
+  -p 5060:5060/udp -p 5060:5060/tcp \
+  -p 8080:8080 \
+  -p 10000-10099:10000-10099/udp \
+  -e EXTERNAL_IP=192.168.1.50 \
+  ghcr.io/x-phone/xpbx:latest
+
+# Docker Compose — Tailscale / VPN
 EXTERNAL_IP=100.96.49.117 make up
 
-# LAN-only
+# Docker Compose — LAN-only
 EXTERNAL_IP=192.168.1.50 make up
 ```
 
-Or set it in a `.env` file:
+Or set it in a `.env` file (docker-compose only):
 
 ```
 EXTERNAL_IP=100.96.49.117
