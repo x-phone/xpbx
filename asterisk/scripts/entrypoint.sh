@@ -147,8 +147,8 @@ EOF
 
   echo "Voiceworker: extension $VOICEWORKER_EXTEN -> $VOICEWORKER_HOST (media_address=$CONTAINER_IP)"
 else
-  # Clean up any leftover config from previous runs
-  rm -f /etc/asterisk/pjsip_voiceworker.conf
+  # Create empty config files (sorcery.conf references pjsip_voiceworker.conf)
+  : > /etc/asterisk/pjsip_voiceworker.conf
   rm -f /etc/asterisk/extensions_voiceworker.conf
 fi
 
