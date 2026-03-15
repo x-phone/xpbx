@@ -17,15 +17,29 @@ Self-hosted PBX with a web UI. Manages Asterisk via SQLite Realtime and ARI.
 
 ## Quick start
 
+### Docker
+
+```bash
+docker run -d --name xpbx \
+  -p 5060:5060/udp -p 5060:5060/tcp \
+  -p 8080:8080 \
+  -p 10000-10099:10000-10099/udp \
+  ghcr.io/x-phone/xpbx:latest
+```
+
+### Docker Compose (for development)
+
 ```bash
 git clone https://github.com/x-phone/xpbx.git
 cd xpbx
 make up
 ```
 
+---
+
 Open **http://localhost:8080** — the web UI is ready.
 
-Register a SIP phone (Obi200, Obi2182, Linphone, Obi100, etc.) to `your-ip:5060` with one of the seeded extensions (1001/1002/1003, password: `password123`).
+Register a SIP phone (Zoiper, Linphone, Obi200, etc.) to `your-ip:5060` with one of the seeded extensions (1001/1002/1003, password: `password123`).
 
 A sample SIP trunk (`my-provider` → `sip.example.com`) and outbound route (`9 + 10 digits`) are also seeded — edit them in the UI with your real provider details.
 
@@ -36,36 +50,72 @@ A sample SIP trunk (`my-provider` → `sip.example.com`) and outbound route (`9 
 Override for specific network setups:
 
 ```bash
-# Tailscale / VPN
-EXTERNAL_IP=100.96.49.117 make up
+# Docker
+docker run -d --name xpbx \
+  -p 5060:5060/udp -p 5060:5060/tcp \
+  -p 8080:8080 \
+  -p 10000-10099:10000-10099/udp \
+  -e EXTERNAL_IP=192.168.1.50 \
+  ghcr.io/x-phone/xpbx:latest
 
-# LAN-only
-EXTERNAL_IP=192.168.1.50 make up
+# Docker Compose
+EXTERNAL_IP=100.96.49.117 make up
 ```
 
-Or set it in a `.env` file:
+Or set it in a `.env` file (docker-compose only):
 
 ```
 EXTERNAL_IP=100.96.49.117
 ```
 
+### Asterisk CLI
+
+Access the Asterisk console for debugging:
+
+```bash
+# Docker
+docker exec -it xpbx asterisk -rvvv
+
+# Docker Compose
+make asterisk-cli
+```
+
+### Data persistence
+
+To persist data across container restarts, mount a volume:
+
+```bash
+docker run -d --name xpbx \
+  -v xpbx-data:/data \
+  -p 5060:5060/udp -p 5060:5060/tcp \
+  -p 8080:8080 \
+  -p 10000-10099:10000-10099/udp \
+  ghcr.io/x-phone/xpbx:latest
+```
+
 ## Architecture
 
 ```
-┌──────────────┐     SQLite      ┌──────────────┐
-│   xpbx       │───(Realtime)───▸│   Asterisk   │
-│   Web UI     │                 │   PBX        │
-│   Go/templ   │◂───(ARI)───────│   pjsip      │
-└──────┬───────┘                 └──────┬───────┘
-       │ :8080                          │ :5060
-       │                                │
-   Browser                         SIP Phones
+┌─────────────────────────────────┐
+│         xpbx container          │
+│                                 │
+│  ┌──────────┐    ┌───────────┐  │
+│  │  xpbx    │───▸│ Asterisk  │  │
+│  │  Web UI  │    │ PBX       │  │
+│  │  Go/templ│◂───│ pjsip     │  │
+│  └────┬─────┘    └─────┬─────┘  │
+│       │ :8080          │ :5060  │
+│       │    SQLite ◂──▸ │        │
+└───────┼────────────────┼────────┘
+        │                │
+    Browser          SIP Phones
 ```
 
 - **xpbx** writes SIP configuration and dialplan rules to a shared SQLite database
 - **Asterisk** reads them via [Realtime](https://docs.asterisk.org/Configuration/Interfaces/Asterisk-Realtime-Architecture/) (`res_config_sqlite3`)
 - **ARI** (Asterisk REST Interface) provides live system info, channel management, and module control
 - Changes take effect immediately — xpbx checkpoints the WAL and reloads the SQLite module
+- The Docker image bundles both services; `docker-compose.yml` runs them as separate containers for development
 
 ## Services
 
@@ -78,7 +128,7 @@ EXTERNAL_IP=100.96.49.117
 
 ## Configuration
 
-All configuration is via environment variables in `docker-compose.yml`:
+All configuration is via environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -97,6 +147,16 @@ All configuration is via environment variables in `docker-compose.yml`:
 ### Asterisk config overrides
 
 The default Asterisk configuration works out of the box. For advanced use cases, you can override any config file via volume mounts:
+
+```bash
+# Docker
+docker run -d --name xpbx \
+  -v ./my-pjsip.conf:/etc/asterisk/pjsip.conf:ro \
+  -p 5060:5060/udp -p 5060:5060/tcp \
+  -p 8080:8080 \
+  -p 10000-10099:10000-10099/udp \
+  ghcr.io/x-phone/xpbx:latest
+```
 
 ```yaml
 # docker-compose.override.yml
@@ -157,8 +217,10 @@ xpbx/
 │   │   └── router/       # Routes and middleware
 │   ├── templates/        # templ HTML templates
 │   ├── static/           # CSS and JS assets
-│   └── Dockerfile
-├── docker-compose.yml
+│   └── Dockerfile        # Server-only image (for docker-compose)
+├── Dockerfile.release    # All-in-one image (Asterisk + xpbx)
+├── entrypoint-all.sh     # All-in-one entrypoint
+├── docker-compose.yml    # Two-container dev setup
 └── Makefile
 ```
 
@@ -306,9 +368,20 @@ xpbx is the PBX component of the [x-phone](https://github.com/x-phone) ecosystem
 
 ### xbridge integration
 
-To connect xpbx to [xbridge](https://github.com/x-phone/xbridge) for voice AI, set `VOICEWORKER_HOST` in your `.env` or `docker-compose.yml`:
+To connect xpbx to [xbridge](https://github.com/x-phone/xbridge) for voice AI, set `VOICEWORKER_HOST`:
+
+```bash
+# Docker
+docker run -d --name xpbx \
+  -p 5060:5060/udp -p 5060:5060/tcp \
+  -p 8080:8080 \
+  -p 10000-10099:10000-10099/udp \
+  -e VOICEWORKER_HOST=xbridge:5080 \
+  ghcr.io/x-phone/xpbx:latest
+```
 
 ```yaml
+# docker-compose.yml
 environment:
   - VOICEWORKER_HOST=xbridge:5080
   - VOICEWORKER_EXTEN=2000        # optional, default is 2000
