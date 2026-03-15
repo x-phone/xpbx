@@ -130,6 +130,10 @@ export LOG_LEVEL=${LOG_LEVEL:-info}
 /app/xpbx &
 XPBX_PID=$!
 
+# Wait for xpbx to seed the database, then reload PJSIP so Asterisk picks up the extensions
+sleep 2
+/usr/sbin/asterisk -rx "module reload res_pjsip.so" > /dev/null 2>&1
+
 echo "xpbx ready — SIP on :5060, Web UI on :8080"
 
 # Shutdown handler
