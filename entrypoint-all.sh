@@ -112,8 +112,8 @@ ln -sfn "$SOUNDS_DATA" "$SOUNDS_DIR"
 
 # --- Start services ---
 
-# Start Asterisk in foreground (background in this script)
-/usr/sbin/asterisk -f &
+# Start Asterisk with a pseudo-TTY (prevents CPU spin from console without TTY)
+script -q -c "/usr/sbin/asterisk -f" /dev/null &
 ASTERISK_PID=$!
 
 sleep 2
@@ -132,8 +132,8 @@ XPBX_PID=$!
 
 echo "xpbx ready — SIP on :5060, Web UI on :8080"
 
-# Shutdown handler: kill both processes on signal
+# Shutdown handler
 trap 'kill $ASTERISK_PID $XPBX_PID 2>/dev/null; wait' TERM INT
 
-# Wait forever (both are backgrounded)
+# Wait for either process to exit
 wait $ASTERISK_PID $XPBX_PID
