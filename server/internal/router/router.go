@@ -59,6 +59,21 @@ func New(db *database.DB, ariClient *ari.Client, cfg *config.Config) http.Handle
 	r.HandleFunc("/dialplan/{id}", dpH.Update).Methods("PUT")
 	r.HandleFunc("/dialplan/{id}", dpH.Delete).Methods("DELETE")
 
+	// JSON API
+	apiH := handlers.NewAPIHandler(db, ariClient)
+
+	r.HandleFunc("/api/trunks", apiH.ListTrunks).Methods("GET")
+	r.HandleFunc("/api/trunks/{id}", apiH.GetTrunk).Methods("GET")
+	r.HandleFunc("/api/trunks", apiH.CreateTrunk).Methods("POST")
+	r.HandleFunc("/api/trunks/{id}", apiH.UpdateTrunk).Methods("PUT")
+	r.HandleFunc("/api/trunks/{id}", apiH.DeleteTrunk).Methods("DELETE")
+
+	r.HandleFunc("/api/dialplan", apiH.ListDialplanRules).Methods("GET")
+	r.HandleFunc("/api/dialplan/{id}", apiH.GetDialplanRule).Methods("GET")
+	r.HandleFunc("/api/dialplan", apiH.CreateDialplanRule).Methods("POST")
+	r.HandleFunc("/api/dialplan/{id}", apiH.UpdateDialplanRule).Methods("PUT")
+	r.HandleFunc("/api/dialplan/{id}", apiH.DeleteDialplanRule).Methods("DELETE")
+
 	// API actions
 	r.PathPrefix("/api/calls/").HandlerFunc(dashH.HangupCall).Methods("DELETE")
 	r.HandleFunc("/api/asterisk/reload", dashH.ReloadPJSIP).Methods("POST")

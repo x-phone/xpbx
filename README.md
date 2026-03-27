@@ -224,129 +224,79 @@ xpbx/
 
 ## API Reference
 
-xpbx exposes a web UI and a set of HTTP endpoints for managing extensions, trunks, and dialplan rules. Most endpoints return HTML (designed for HTMX), but can be called from any HTTP client.
+xpbx exposes two sets of endpoints:
 
-All write operations use **form-encoded** request bodies (`application/x-www-form-urlencoded`).
+- **JSON API** (`/api/...`) — for programmatic automation. Accepts and returns `application/json`.
+- **HTML endpoints** — for the web UI (HTMX). Accept `application/x-www-form-urlencoded`, return HTML.
 
-### Extensions
+### JSON API — Trunks
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/extensions` | List all extensions |
-| `GET` | `/extensions/new` | New extension form |
-| `GET` | `/extensions/{id}/edit` | Edit extension form |
-| `POST` | `/extensions` | Create extension |
-| `PUT` | `/extensions/{id}` | Update extension |
-| `DELETE` | `/extensions/{id}` | Delete extension |
-
-**Create / Update fields:**
-
-| Field | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `extension` | yes | — | Extension number (e.g. `1001`) |
-| `password` | yes | — | SIP auth password |
-| `context` | yes | `from-internal` | Dialplan context |
-| `display_name` | no | — | Friendly name |
-| `codecs` | no | `ulaw` | Comma-separated codec list |
-| `max_contacts` | no | `10` | Max simultaneous registrations |
-| `routing_enabled` | no | `on` | Enable call routing rules |
-| `routing_pattern` | no | `ring_voicemail` | One of: `ring_only`, `ring_voicemail`, `voicemail_only` |
-| `routing_timeout` | no | `20` | Ring timeout in seconds |
-| `vm_enabled` | no | `on` | Enable voicemail |
-| `vm_pin` | no | `0000` | Voicemail access PIN |
-| `vm_email` | no | — | Email for voicemail notifications |
-
-**Example — create an extension:**
+| `GET` | `/api/trunks` | List all trunks |
+| `GET` | `/api/trunks/{id}` | Get single trunk |
+| `POST` | `/api/trunks` | Create trunk |
+| `PUT` | `/api/trunks/{id}` | Update trunk |
+| `DELETE` | `/api/trunks/{id}` | Delete trunk |
 
 ```bash
-curl -X POST http://localhost:8080/extensions \
-  -d "extension=1004&password=secret4&context=from-internal&display_name=Office+Phone&codecs=ulaw,g722"
+# List trunks
+curl http://localhost:8080/api/trunks
+
+# Create a trunk
+curl -X POST http://localhost:8080/api/trunks \
+  -H "Content-Type: application/json" \
+  -d '{"name":"my-trunk","host":"sip.provider.com","port":5060,"context":"from-trunk","codecs":"ulaw","auth_user":"myuser","auth_pass":"mypass"}'
+
+# Update a trunk
+curl -X PUT http://localhost:8080/api/trunks/1 \
+  -H "Content-Type: application/json" \
+  -d '{"name":"my-trunk","host":"sip2.provider.com","port":5060,"context":"from-trunk"}'
+
+# Delete a trunk
+curl -X DELETE http://localhost:8080/api/trunks/1
 ```
 
-### Trunks
+### JSON API — Dialplan
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/trunks` | List all trunks |
-| `GET` | `/trunks/new` | New trunk form |
-| `GET` | `/trunks/{id}/edit` | Edit trunk form |
-| `POST` | `/trunks` | Create trunk |
-| `PUT` | `/trunks/{id}` | Update trunk |
-| `DELETE` | `/trunks/{id}` | Delete trunk |
-
-**Create / Update fields:**
-
-| Field | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `name` | yes | — | Trunk identifier (unique) |
-| `host` | yes | — | SIP server hostname or IP |
-| `context` | yes | `from-trunk` | Dialplan context for inbound calls |
-| `display_name` | no | — | Friendly name |
-| `provider` | no | — | Provider name (informational) |
-| `port` | no | `5060` | SIP port |
-| `auth_user` | no | — | SIP authentication username |
-| `auth_pass` | no | — | SIP authentication password |
-| `codecs` | no | `ulaw` | Comma-separated codec list |
-
-**Example — create a trunk:**
+| `GET` | `/api/dialplan` | List all rules |
+| `GET` | `/api/dialplan/{id}` | Get single rule |
+| `POST` | `/api/dialplan` | Create rule |
+| `PUT` | `/api/dialplan/{id}` | Update rule |
+| `DELETE` | `/api/dialplan/{id}` | Delete rule |
 
 ```bash
-curl -X POST http://localhost:8080/trunks \
-  -d "name=my-provider&host=sip.provider.com&context=from-trunk&auth_user=myuser&auth_pass=mypass"
+# List dialplan rules
+curl http://localhost:8080/api/dialplan
+
+# Create a dialplan rule
+curl -X POST http://localhost:8080/api/dialplan \
+  -H "Content-Type: application/json" \
+  -d '{"context":"from-internal","exten":"_3XXX","priority":1,"app":"Dial","appdata":"PJSIP/${EXTEN}@my-trunk,30"}'
+
+# Delete a rule
+curl -X DELETE http://localhost:8080/api/dialplan/10
 ```
 
-### Dialplan
+### JSON API — System
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/dialplan` | List rules (simple view) |
-| `GET` | `/dialplan?mode=advanced` | List rules (raw table view) |
-| `GET` | `/dialplan/new` | New rule form |
-| `GET` | `/dialplan/{id}/edit` | Edit rule form |
-| `POST` | `/dialplan` | Create rule |
-| `PUT` | `/dialplan/{id}` | Update rule |
-| `DELETE` | `/dialplan/{id}` | Delete rule |
-
-**Create / Update fields:**
-
-| Field | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `context` | yes | `from-internal` | Dialplan context |
-| `exten` | yes | — | Extension pattern (e.g. `1001`, `_2XXX`, `_NXXXXXX`) |
-| `priority` | yes | `1` | Execution order |
-| `app` | yes | — | Asterisk application (`Dial`, `VoiceMail`, `Hangup`, etc.) |
-| `appdata` | no | — | Application arguments (e.g. `PJSIP/1001,20`) |
-
-**Example — create a dialplan rule:**
-
-```bash
-curl -X POST http://localhost:8080/dialplan \
-  -d "context=from-internal&exten=_9NXXXXXX&priority=1&app=Dial&appdata=PJSIP/my-provider/\${EXTEN:1}"
-```
-
-### Dashboard & System
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/dashboard` | Dashboard page |
-| `GET` | `/partials/system-info` | Asterisk system info (HTML partial, polled every 10s) |
-| `GET` | `/partials/registrations` | Registered SIP endpoints (HTML partial, polled every 5s) |
-| `GET` | `/partials/active-calls` | Active call channels (HTML partial, polled every 5s) |
-| `GET` | `/partials/sip-config/{id}` | SIP configuration modal for extension |
 | `DELETE` | `/api/calls/{channelId}` | Hang up an active call |
 | `POST` | `/api/asterisk/reload` | Reload Asterisk PJSIP module |
 
-**Example — hang up a call:**
+### HTML Endpoints (Web UI)
 
-```bash
-curl -X DELETE http://localhost:8080/api/calls/1234567890.42
-```
+The web UI uses form-encoded HTML endpoints. These can also be called programmatically but the JSON API above is preferred for automation.
 
-**Example — reload PJSIP:**
-
-```bash
-curl -X POST http://localhost:8080/api/asterisk/reload
-```
+| Resource | List | Create | Update | Delete |
+|----------|------|--------|--------|--------|
+| Extensions | `GET /extensions` | `POST /extensions` | `PUT /extensions/{id}` | `DELETE /extensions/{id}` |
+| Trunks | `GET /trunks` | `POST /trunks` | `PUT /trunks/{id}` | `DELETE /trunks/{id}` |
+| Dialplan | `GET /dialplan` | `POST /dialplan` | `PUT /dialplan/{id}` | `DELETE /dialplan/{id}` |
+| Dashboard | `GET /dashboard` | — | — | — |
 
 ## Part of x-phone
 
