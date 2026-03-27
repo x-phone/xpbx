@@ -12,6 +12,8 @@ import (
 	"github.com/x-phone/xpbx/server/internal/database"
 )
 
+const maxRequestBody = 1 << 20 // 1 MB
+
 type APIHandler struct {
 	db  *database.DB
 	ari *ari.Client
@@ -38,6 +40,11 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }
 
+// sanitizeTrunk clears sensitive fields before sending a trunk in a response.
+func sanitizeTrunk(t *database.Trunk) {
+	t.AuthPass = ""
+}
+
 // --- Trunks ---
 
 func (h *APIHandler) ListTrunks(w http.ResponseWriter, r *http.Request) {
@@ -49,6 +56,9 @@ func (h *APIHandler) ListTrunks(w http.ResponseWriter, r *http.Request) {
 	}
 	if trunks == nil {
 		trunks = []database.Trunk{}
+	}
+	for i := range trunks {
+		sanitizeTrunk(&trunks[i])
 	}
 	writeJSON(w, http.StatusOK, trunks)
 }
@@ -69,10 +79,12 @@ func (h *APIHandler) GetTrunk(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "trunk not found")
 		return
 	}
+	sanitizeTrunk(t)
 	writeJSON(w, http.StatusOK, t)
 }
 
 func (h *APIHandler) CreateTrunk(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
 	var t database.Trunk
 	if err := json.NewDecoder(r.Body).Decode(&t); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
@@ -93,12 +105,13 @@ func (h *APIHandler) CreateTrunk(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.db.CreateTrunk(&t); err != nil {
 		log.WithError(err).Error("API: failed to create trunk")
-		writeError(w, http.StatusInternalServerError, "failed to create trunk: "+err.Error())
+		writeError(w, http.StatusInternalServerError, "failed to create trunk")
 		return
 	}
 
 	h.notifyAsterisk()
 	log.WithField("trunk", t.Name).Info("API: trunk created")
+	sanitizeTrunk(&t)
 	writeJSON(w, http.StatusCreated, t)
 }
 
@@ -109,6 +122,7 @@ func (h *APIHandler) UpdateTrunk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
 	var t database.Trunk
 	if err := json.NewDecoder(r.Body).Decode(&t); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
@@ -128,6 +142,7 @@ func (h *APIHandler) UpdateTrunk(w http.ResponseWriter, r *http.Request) {
 
 	h.notifyAsterisk()
 	log.WithField("trunk", t.Name).Info("API: trunk updated")
+	sanitizeTrunk(&t)
 	writeJSON(w, http.StatusOK, t)
 }
 
@@ -183,6 +198,7 @@ func (h *APIHandler) GetDialplanRule(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *APIHandler) CreateDialplanRule(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
 	var rule database.DialplanRule
 	if err := json.NewDecoder(r.Body).Decode(&rule); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
@@ -199,7 +215,7 @@ func (h *APIHandler) CreateDialplanRule(w http.ResponseWriter, r *http.Request) 
 
 	if err := h.db.CreateDialplanRule(&rule); err != nil {
 		log.WithError(err).Error("API: failed to create dialplan rule")
-		writeError(w, http.StatusInternalServerError, "failed to create rule: "+err.Error())
+		writeError(w, http.StatusInternalServerError, "failed to create rule")
 		return
 	}
 
@@ -215,6 +231,7 @@ func (h *APIHandler) UpdateDialplanRule(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
 	var rule database.DialplanRule
 	if err := json.NewDecoder(r.Body).Decode(&rule); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")

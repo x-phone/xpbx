@@ -67,11 +67,13 @@ func TestAPITrunks_CRUD(t *testing.T) {
 
 	// Create
 	trunk := map[string]any{
-		"name":    "test-trunk",
-		"host":    "10.0.0.1",
-		"port":    5080,
-		"context": "from-trunk",
-		"codecs":  "ulaw,alaw",
+		"name":      "test-trunk",
+		"host":      "10.0.0.1",
+		"port":      5080,
+		"context":   "from-trunk",
+		"codecs":    "ulaw,alaw",
+		"auth_user": "myuser",
+		"auth_pass": "secret123",
 	}
 	w = doRequest(h.CreateTrunk, "POST", "/api/trunks", trunk, nil)
 	if w.Code != http.StatusCreated {
@@ -85,6 +87,9 @@ func TestAPITrunks_CRUD(t *testing.T) {
 	if created.ID == 0 {
 		t.Error("create: ID should be set")
 	}
+	if created.AuthPass != "" {
+		t.Error("create: auth_pass should not be returned in response")
+	}
 
 	// Get
 	w = doRequest(h.GetTrunk, "GET", "/api/trunks/1", nil, map[string]string{"id": "1"})
@@ -95,6 +100,9 @@ func TestAPITrunks_CRUD(t *testing.T) {
 	json.NewDecoder(w.Body).Decode(&got)
 	if got.Host != "10.0.0.1" {
 		t.Errorf("get: host = %q, want %q", got.Host, "10.0.0.1")
+	}
+	if got.AuthPass != "" {
+		t.Error("get: auth_pass should not be returned in response")
 	}
 
 	// Update
