@@ -248,12 +248,27 @@ func (h *ExtensionHandler) applyRouting(r *http.Request, context, exten string) 
 			log.WithFields(log.Fields{"extension": exten, "pattern": pattern}).Info("Routing rules applied")
 			h.notifyAsterisk()
 		}
+
+		// Create a matching rule in from-trunk so SIP REFER (blind transfer)
+		// targets can resolve without exposing all of from-internal.
+		if context == "from-internal" {
+			if err := h.db.EnsureRouting("from-trunk", exten, pattern, timeout); err != nil {
+				log.WithError(err).Error("Failed to create transfer-target routing rules")
+			}
+		}
 	} else if r.FormValue("routing_remove") == "on" {
 		if err := h.db.DeleteDialplanRulesForExten(context, exten); err != nil {
 			log.WithError(err).Error("Failed to remove routing rules")
 		} else {
 			log.WithField("extension", exten).Info("Routing rules removed")
 			h.notifyAsterisk()
+		}
+
+		// Also remove from-trunk transfer-target rules.
+		if context == "from-internal" {
+			if err := h.db.DeleteDialplanRulesForExten("from-trunk", exten); err != nil {
+				log.WithError(err).Error("Failed to remove transfer-target routing rules")
+			}
 		}
 	}
 }
@@ -291,6 +306,10 @@ func (h *ExtensionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	ext, err := h.db.GetExtension(id)
 	if err == nil && ext != nil {
 		h.db.DeleteDialplanRulesForExten(ext.Context, id)
+		// Also remove from-trunk transfer-target rules.
+		if ext.Context == "from-internal" {
+			h.db.DeleteDialplanRulesForExten("from-trunk", id)
+		}
 	}
 	h.db.DeleteVoicemailSettings(id)
 

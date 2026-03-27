@@ -47,6 +47,19 @@ func (db *DB) Seed() error {
 		{Context: "from-internal", Exten: "1003", Priority: 1, App: "NoOp", AppData: "Calling extension 1003"},
 		{Context: "from-internal", Exten: "1003", Priority: 2, App: "Dial", AppData: "PJSIP/1003,20"},
 		{Context: "from-internal", Exten: "1003", Priority: 3, App: "Hangup", AppData: ""},
+
+		// from-trunk transfer targets — allow SIP REFER to reach internal extensions
+		{Context: "from-trunk", Exten: "1001", Priority: 1, App: "NoOp", AppData: "Calling extension 1001"},
+		{Context: "from-trunk", Exten: "1001", Priority: 2, App: "Dial", AppData: "PJSIP/1001,20"},
+		{Context: "from-trunk", Exten: "1001", Priority: 3, App: "Hangup", AppData: ""},
+
+		{Context: "from-trunk", Exten: "1002", Priority: 1, App: "NoOp", AppData: "Calling extension 1002"},
+		{Context: "from-trunk", Exten: "1002", Priority: 2, App: "Dial", AppData: "PJSIP/1002,20"},
+		{Context: "from-trunk", Exten: "1002", Priority: 3, App: "Hangup", AppData: ""},
+
+		{Context: "from-trunk", Exten: "1003", Priority: 1, App: "NoOp", AppData: "Calling extension 1003"},
+		{Context: "from-trunk", Exten: "1003", Priority: 2, App: "Dial", AppData: "PJSIP/1003,20"},
+		{Context: "from-trunk", Exten: "1003", Priority: 3, App: "Hangup", AppData: ""},
 	}
 	for i := range rules {
 		if err := db.CreateDialplanRule(&rules[i]); err != nil {
