@@ -617,13 +617,15 @@ func TestSeed(t *testing.T) {
 		t.Errorf("seed created %d extensions, want 3", len(exts))
 	}
 
-	// Check dialplan rules created (3 per extension = 9, plus 3 outbound trunk route = 12)
+	// Check dialplan rules created:
+	// 3 per extension in from-internal = 9, plus 3 per extension in from-trunk = 9,
+	// plus 3 outbound trunk route = 21
 	rules, err := db.ListDialplanRules()
 	if err != nil {
 		t.Fatalf("list rules: %v", err)
 	}
-	if len(rules) != 12 {
-		t.Errorf("seed created %d rules, want 12", len(rules))
+	if len(rules) != 21 {
+		t.Errorf("seed created %d rules, want 21", len(rules))
 	}
 
 	// Check trunk created
