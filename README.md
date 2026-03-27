@@ -21,6 +21,7 @@ Self-hosted PBX with a web UI. Manages Asterisk via SQLite Realtime and ARI.
 
 ```bash
 docker run -d --name xpbx \
+  -v xpbx-data:/data \
   -p 5060:5060/udp -p 5060:5060/tcp \
   -p 8080:8080 \
   -p 10000-10099:10000-10099/udp \
@@ -52,6 +53,7 @@ Override for specific network setups:
 ```bash
 # Docker
 docker run -d --name xpbx \
+  -v xpbx-data:/data \
   -p 5060:5060/udp -p 5060:5060/tcp \
   -p 8080:8080 \
   -p 10000-10099:10000-10099/udp \
@@ -78,19 +80,6 @@ docker exec -it xpbx asterisk -rvvv
 
 # Docker Compose
 make asterisk-cli
-```
-
-### Data persistence
-
-To persist data across container restarts, mount a volume:
-
-```bash
-docker run -d --name xpbx \
-  -v xpbx-data:/data \
-  -p 5060:5060/udp -p 5060:5060/tcp \
-  -p 8080:8080 \
-  -p 10000-10099:10000-10099/udp \
-  ghcr.io/x-phone/xpbx:latest
 ```
 
 ## Architecture
@@ -151,6 +140,7 @@ The default Asterisk configuration works out of the box. For advanced use cases,
 ```bash
 # Docker
 docker run -d --name xpbx \
+  -v xpbx-data:/data \
   -v ./my-pjsip.conf:/etc/asterisk/pjsip.conf:ro \
   -p 5060:5060/udp -p 5060:5060/tcp \
   -p 8080:8080 \
@@ -373,6 +363,7 @@ To connect xpbx to [xbridge](https://github.com/x-phone/xbridge) for voice AI, s
 ```bash
 # Docker
 docker run -d --name xpbx \
+  -v xpbx-data:/data \
   -p 5060:5060/udp -p 5060:5060/tcp \
   -p 8080:8080 \
   -p 10000-10099:10000-10099/udp \

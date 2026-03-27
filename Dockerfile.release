@@ -31,8 +31,9 @@ COPY --from=builder /app/static /app/static
 COPY entrypoint-all.sh /entrypoint-all.sh
 RUN chmod +x /entrypoint-all.sh /scripts/entrypoint.sh
 
-# Data directory (SQLite DB, sounds)
+# Data directory (SQLite DB, voicemail config)
 RUN mkdir -p /data && chown -R asterisk:asterisk /data /app /etc/asterisk
+VOLUME /data
 
 USER asterisk
 
